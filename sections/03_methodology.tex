@@ -14,61 +14,98 @@ $Z \in \mathbb{R}^{d}$. The observed data are i.i.d.\ tuples
     \quad
     \delta_i = \mathbf{1}\{T_i \le C_i\}.
 \]
-Throughout this paper we assume \emph{conditionally independent
-censoring}, $T \perp C \mid Z$ (the uninformative case); the extension to
-shared-frailty informative censoring is sketched in
-Section~\ref{sec:discussion}.
+We assume \emph{conditionally independent censoring}, $T \perp C \mid Z$
+(the uninformative case); the shared-frailty informative-censoring extension
+is sketched in Section~\ref{sec:discussion}. We jointly learn two generative
+models for $T \mid Z$ and $C \mid Z$ such that both the conditional density
+and conditional survival function admit closed forms (used in the censored
+log-likelihood) and such that samples can be drawn with exact gradients (used
+in the distributional regularizer). We meet both requirements with a real
+conditional normalizing flow whose forward direction is closed-form and whose
+inverse is reattached to gradients via implicit reparameterization. The two
+flows are denoted $h_{\theta_1}$ for $T$ and $h_{\theta_2}$ for $C$ and have
+disjoint parameters; for brevity we describe a single flow in
+Section~\ref{sec:flow}--\ref{sec:samp} and write $\theta = \theta_1$ or
+$\theta_2$.
 
-Our goal is to learn generative models $g_1, g_2$ such that
-\[
-    T = g_1(Z, \tau_1),
-    \qquad
-    C = g_2(Z, \tau_2),
-    \qquad
-    \tau_1, \tau_2 \sim \mathcal{N}(0, 1)\text{ independent},
-\]
-and such that the implied conditional densities $f_{T|Z}, f_{C|Z}$ and
-survival functions $S_{T|Z}, S_{C|Z}$ admit closed forms suitable for the
-censored log-likelihood.
-
-\subsection{Conditional monotone normalizing flow on log-time}
+\subsection{Conditional monotone normalizing flow}
 \label{sec:flow}
 
-We model both $T \mid Z$ and $C \mid Z$ with a conditional normalizing flow
-on $\log T$, with a standard-Gaussian base. Concretely, define a forward map
+\paragraph{Forward map.}
+We parameterize the flow on the log-time axis with a $K$-component
+tanh-of-affine basis on top of an MLP backbone. Given a covariate $z$, the
+forward map $h_\theta(\,\cdot\,;\, z): \mathbb{R} \to \mathbb{R}$ is
 \begin{equation}
     h_\theta(\log t;\, z)
-    \;=\; a(z)\,\log t \;+\; b(z)
+    \;=\;
+    a(z)\,\log t \;+\; b(z)
         \;+\; \sum_{k=1}^{K} \alpha_k(z)\, \tanh\!\left(\frac{\log t - \mu_k(z)}{s_k(z)}\right),
     \label{eq:flow}
 \end{equation}
-where the coefficient functions $a, b, \{\alpha_k, \mu_k, s_k\}_{k=1}^{K}$
-are output by a small MLP applied to $z$. We enforce the positivity
-constraints
+where $a, b, \{\alpha_k, \mu_k, s_k\}_{k=1}^{K}$ are produced by a single
+shared MLP $\psi_\theta: \mathbb{R}^{d} \to \mathbb{R}^{2 + 3K}$ followed by
+output-specific reparameterizations. In the released implementation $\psi$
+has the architecture
 \[
-    a(z) > 0,
-    \qquad
-    \alpha_k(z) \ge 0,
-    \qquad
-    s_k(z) > 0
+    z
+    \;\xrightarrow{\;\;\text{Linear}(d \to 32)\;\;}
+    \;\xrightarrow{\;\;\tanh\;\;}
+    \;\xrightarrow{\;\;\text{Linear}(32 \to 32)\;\;}
+    \;\xrightarrow{\;\;\tanh\;\;}
+    \;\xrightarrow{\;\;\text{Linear}(32 \to 2 + 3K)\;\;}
+    \;\;,
 \]
-via shifted softplus activations. Each $\tanh$ component is monotone in
-$\log t$, so under these constraints $h_\theta(\cdot; z)$ is strictly
-increasing in $\log t$ for every $z$, hence invertible. We take the base
-distribution to be standard normal,
-\(
-    U \;=\; h_\theta(\log T;\, Z) \;\sim\; \mathcal{N}(0, 1).
-\)
+and we split its $2 + 3K$ outputs into raw heads
+$(\widetilde{a}, b, \widetilde{\alpha}_{1:K}, \mu_{1:K}, \widetilde{s}_{1:K})$.
+The constraint reparameterizations are
+\begin{equation}
+    a(z) \;=\; \operatorname{softplus}(\widetilde{a}(z)) + a_0,
+    \quad
+    \alpha_k(z) \;=\; \alpha_{\max}\,\operatorname{softplus}(\widetilde{\alpha}_k(z)),
+    \quad
+    s_k(z) \;=\; \operatorname{softplus}(\widetilde{s}_k(z)) + s_0,
+    \label{eq:reparam}
+\end{equation}
+with shifts $a_0 = 0.10$, $s_0 = 0.20$ and a scale $\alpha_{\max} = 0.5$. The
+shifts ensure that $a(z) \ge a_0 > 0$ and $s_k(z) \ge s_0 > 0$ at
+initialization (avoiding the early-training collapse mode in which a learned
+positive scale is initialized arbitrarily close to zero), and the bound on
+$\alpha_k$ keeps the tanh perturbations moderate so that the linear term
+$a(z)\,\log t$ dominates at the start of training and the flow does not
+diverge before any gradient signal arrives. The intercept $b(z)$ and the knot
+locations $\mu_k(z)$ are unconstrained.
+
+\paragraph{Strict monotonicity.}
+The Jacobian of~\eqref{eq:flow} with respect to $\log t$ is
+\begin{equation}
+    h'_\theta(\log t;\, z)
+    \;\equiv\;
+    \frac{\partial h_\theta}{\partial \log t}(\log t;\, z)
+    \;=\;
+    a(z) \;+\; \sum_{k=1}^{K} \frac{\alpha_k(z)}{s_k(z)}\,
+        \operatorname{sech}^{2}\!\left(\frac{\log t - \mu_k(z)}{s_k(z)}\right).
+    \label{eq:jacobian}
+\end{equation}
+Each $\operatorname{sech}^{2}$ term is non-negative, $\alpha_k(z), s_k(z) > 0$
+by~\eqref{eq:reparam}, and $a(z) \ge a_0 > 0$, so
+$h'_\theta(\log t;\, z) \ge a_0 > 0$ for all $\log t \in \mathbb{R}$ and all
+$z$. Strict monotonicity is therefore enforced by construction (rather than
+by a soft penalty), which guarantees that $h_\theta(\,\cdot\,;\, z)$ is a
+diffeomorphism on $\mathbb{R}$ and that the change-of-variable formula below
+holds without exception.
 
 \paragraph{Closed-form density and survival.}
-By construction $F_{T|Z}(t \mid z) = \Phi\!\left(h_\theta(\log t;\, z)\right)$,
-which yields, by the chain rule,
+We take the base distribution to be standard normal, $U \sim \mathcal{N}(0, 1)$,
+and define $T$ implicitly through $U = h_\theta(\log T;\, Z)$. Because
+$h_\theta(\,\cdot\,; z)$ is strictly increasing,
+$F_{T|Z}(t \mid z) = \Phi(h_\theta(\log t;\, z))$, and the chain rule
+yields
 \begin{align}
     \log f_{T|Z}(t \mid z)
     &\;=\;
     \log \phi\!\left(h_\theta(\log t;\, z)\right)
     \;+\;
-    \log \!\left(\frac{\partial h_\theta}{\partial \log t}(\log t;\, z)\right)
+    \log\, h'_\theta(\log t;\, z)
     \;-\;
     \log t,
     \label{eq:logpdf}\\[2pt]
@@ -77,33 +114,38 @@ which yields, by the chain rule,
     \log \Phi\!\left(-\,h_\theta(\log t;\, z)\right),
     \label{eq:logsurv}
 \end{align}
-where $\phi$ and $\Phi$ are the standard-normal density and CDF. The Jacobian
-$\partial h_\theta / \partial \log t$ has a simple closed form,
-\[
-    \frac{\partial h_\theta}{\partial \log t}(\log t;\, z)
-    \;=\;
-    a(z)
-    \;+\;
-    \sum_{k=1}^{K}
-        \frac{\alpha_k(z)}{s_k(z)}
-        \operatorname{sech}^{2}\!\left(\frac{\log t - \mu_k(z)}{s_k(z)}\right),
-\]
-so both~\eqref{eq:logpdf} and~\eqref{eq:logsurv} are exact, differentiable in
-$\theta$, and numerically stable: we compute $\log \Phi(-h)$ via
-\texttt{torch.special.ndtr} on $-h$ to avoid catastrophic cancellation in the
-upper tail. We instantiate two independent flows $h_{\theta_1}, h_{\theta_2}$
-for $T$ and $C$ respectively, with disjoint parameters.
+where $\phi$ and $\Phi$ are the standard-normal density and CDF. Both
+expressions are evaluated entirely in the \emph{forward} direction
+(equation~\eqref{eq:flow} plus its analytical derivative~\eqref{eq:jacobian}),
+so the likelihood never invokes the inverse of the flow.
+
+\paragraph{Numerical stability.}
+Three implementation details prevent the well-known numerical failure modes
+in the upper and lower tails of the likelihood:
+\begin{itemize}
+    \item In~\eqref{eq:logsurv} we evaluate $\log \Phi(-h)$ via
+          \texttt{torch.special.ndtr} on the negated argument, which uses the
+          symmetry $\Phi(-h) = 1 - \Phi(h)$ implicitly and avoids the
+          catastrophic cancellation that would otherwise occur as
+          $h \to +\infty$. The result is then clamped from below by
+          $10^{-12}$ before the logarithm.
+    \item In~\eqref{eq:logpdf} the Jacobian $h'_\theta$ is clamped from
+          below by $10^{-12}$ before the logarithm. The clamp is never active
+          at convergence because $h'_\theta \ge a_0 = 0.10$, but it makes
+          the gradient well-defined under any pathological transient.
+    \item All occurrences of $\log y$ first apply
+          $\operatorname{clamp}(y, \ge 10^{-8})$ so that observation times
+          arbitrarily close to zero do not produce $-\infty$.
+\end{itemize}
 
 \paragraph{Comparison with the parametric LogNormal alternative.}
-The natural parametric counterpart of~\eqref{eq:flow} is the conditional
-LogNormal, in which the transform reduces to
-$h_{\text{LN}}(\log t; z) = (\log t - \mu(z)) / \sigma(z)$. This is the
-$K=0$ special case and only spans the LogNormal family. The full flow with
-$K \ge 1$ tanh components is strictly more expressive: it can represent
-unimodal distributions whose hazard is non-monotone in $\log t$, including
-Cox--PH-shaped hazards and heavy-tailed log-Student-$t$ shapes that are
-provably outside the LogNormal family. Our simulation study
-(Section~\ref{sec:sim}) quantifies the gap.
+Setting $K = 0$ in~\eqref{eq:flow} reduces $h_\theta$ to
+$h_{\text{LN}}(\log t; z) = a(z)\,\log t + b(z)$, which is exactly the
+conditional LogNormal model with location $-b(z)/a(z)$ and scale $1/a(z)$.
+This is a strict special case of the proposed flow and is the "LogN-flow
+ablation" reported in Section~\ref{sec:sim}: it isolates the contribution of
+the $K$ tanh components ($K = 4$ in our experiments) under an otherwise
+identical optimization pipeline.
 
 \subsection{Censored joint log-likelihood}
 \label{sec:mle}
@@ -111,7 +153,7 @@ provably outside the LogNormal family. Our simulation study
 Under conditionally independent censoring, the contribution of a single
 observation $(x, \delta, z)$ to the joint log-likelihood factorizes as
 \begin{align}
-    \ell_\theta(x, \delta, z)
+    \ell_{\theta_1, \theta_2}(x, \delta, z)
     &\;=\;
     \delta \,\Big[\log f_{T|Z}(x \mid z) + \log S_{C|Z}(x \mid z)\Big]
     \nonumber\\
@@ -120,13 +162,13 @@ observation $(x, \delta, z)$ to the joint log-likelihood factorizes as
     (1 - \delta)\,\Big[\log S_{T|Z}(x \mid z) + \log f_{C|Z}(x \mid z)\Big].
     \label{eq:censmle}
 \end{align}
-Both flows enter additively, so the four terms in~\eqref{eq:censmle} are
-evaluated through~\eqref{eq:logpdf} and~\eqref{eq:logsurv} on the same forward
-pass. The MLE objective is
+Both flows enter additively, so on each forward pass we evaluate
+$\log f_{T|Z}(x \mid z), \log S_{T|Z}(x \mid z)$ via flow $h_{\theta_1}$ and
+$\log f_{C|Z}(x \mid z), \log S_{C|Z}(x \mid z)$ via flow $h_{\theta_2}$,
+combine them according to~\eqref{eq:censmle}, and average over the batch:
 \(
     \mathcal{L}_{\text{MLE}}(\theta_1, \theta_2)
-    \;=\;
-    -\,\frac{1}{n} \sum_{i=1}^{n} \ell_\theta(X_i, \delta_i, Z_i).
+    = -\,\frac{1}{n} \sum_{i=1}^{n} \ell_{\theta_1, \theta_2}(X_i, \delta_i, Z_i).
 \)
 
 \subsection{Soft--Nelson--Aalen Wasserstein regularizer}
@@ -137,11 +179,14 @@ observation against its conditional density but does not directly constrain
 the model-implied population survival curve to match the observed one. We
 augment it with a population-level distributional constraint based on the
 Nelson--Aalen estimator and its $1$-Wasserstein distance to a model-simulated
-counterpart.
+counterpart, made differentiable in $\theta$ by a soft-indicator
+construction.
 
-\paragraph{Observation-side anchor.}
-Given $\mathcal{D}$, define the empirical Nelson--Aalen survival estimator on
-a fixed time grid $\tau_0 < \tau_1 < \cdots < \tau_M$,
+\paragraph{Time grid and observation-side anchor.}
+Let $\tau_0 < \tau_1 < \cdots < \tau_M$ be a time grid spanning the empirical
+$1$\textsuperscript{st}--$99$\textsuperscript{th} percentile of the observed
+$X$, with $M = 80$ knots. We compute the Nelson--Aalen survival on this grid
+from $\mathcal{D}$,
 \[
     \widehat{S}_{\text{obs}}(\tau_m)
     \;=\;
@@ -152,88 +197,116 @@ a fixed time grid $\tau_0 < \tau_1 < \cdots < \tau_M$,
         }{
             \sum_{i} \mathbf{1}\{X_i \ge \tau_j\}
         }
-    \right).
+    \right),
 \]
-This curve is held fixed during training.
+which is held fixed throughout training (it is a function of the data only).
 
-\paragraph{Model-side simulation.}
-For each batch we draw $S$ independent simulations of size $n$. For
-$s = 1, \dots, S$ and $i = 1, \dots, n$ we sample
-\(
-    \tau_1^{(s,i)},\, \tau_2^{(s,i)} \sim \mathcal{N}(0, 1),
-\)
-push them through the inverses of the two flows to obtain
-$T_i^{(s)}, C_i^{(s)}$, and form the simulated censored pair
-\(
-    X_i^{(s)} = \min(T_i^{(s)}, C_i^{(s)}),
-\)
-\(
+\paragraph{Soft simulated curve.}
+For each batch and each $s = 1, \dots, S$ we draw fresh base noise
+$U_T^{(s, i)}, U_C^{(s, i)} \sim \mathcal{N}(0, 1)$ for $i = 1, \dots, n$,
+push it through the inverses of the two flows to obtain
+$T_i^{(s)}, C_i^{(s)}$ (Section~\ref{sec:samp}), and clip both to the
+training time interval $[t_{\min}, t_{\max}] = [10^{-4}, 10]$. The simulated
+event time and a smooth event indicator are
+\[
+    X_i^{(s)} \;=\; \min\!\left(T_i^{(s)},\, C_i^{(s)}\right),
+    \qquad
     \widetilde{\delta}_i^{(s)}
-    = \sigma\!\left((C_i^{(s)} - T_i^{(s)}) / \tau_{\text{temp}}\right),
-\)
-where the soft event indicator uses a sigmoid with temperature
-$\tau_{\text{temp}}$ to keep the eventual loss differentiable through
-$\delta$. The corresponding \emph{differentiable} Nelson--Aalen survival on
-the same grid is
+    \;=\;
+    \sigma\!\left(\frac{C_i^{(s)} - T_i^{(s)}}{\tau_{\text{temp}}}\right),
+\]
+with $\sigma$ the logistic sigmoid and temperature
+$\tau_{\text{temp}} = 0.25$. The corresponding soft Nelson--Aalen survival on
+the same grid $\{\tau_m\}$ is
 \[
     \widetilde{S}_{\text{sim}}^{(s)}(\tau_m)
     \;=\;
     \exp\!\left(
         -\sum_{j \le m}
         \frac{
-            \sum_i \widetilde{\delta}_i^{(s)} \, \kappa_\alpha(X_i^{(s)} - \tau_j)
+            \sum_i \widetilde{\delta}_i^{(s)} \,
+            \big[
+                \sigma\!\left((X_i^{(s)} - \tau_{j-1}) / \alpha\right)
+                - \sigma\!\left((X_i^{(s)} - \tau_j) / \alpha\right)
+            \big]
         }{
             \sum_i \sigma\!\left((X_i^{(s)} - \tau_j) / \alpha\right)
             + \varepsilon
         }
     \right),
 \]
-where the soft at-risk count uses a sigmoid with temperature $\alpha$ and the
-soft event count $\kappa_\alpha$ uses a difference-of-sigmoids window of the
-same temperature.
+where the soft at-risk count is a sigmoid step at temperature $\alpha = 0.20$
+and the soft event count is a difference-of-sigmoids window at the same
+temperature. The numerator stabilizer is $\varepsilon = 10^{-6}$.
 
 \paragraph{Wasserstein objective.}
-For two survival curves on the real line, the $1$-Wasserstein distance equals
-the absolute area between them,
-\(
+The $1$-Wasserstein distance between two survival curves on the real line
+equals the absolute area between them,
+\[
     W_1\!\left(\widehat{S}_{\text{obs}},\, \widetilde{S}_{\text{sim}}^{(s)}\right)
-    =
-    \int_0^{\infty}
-    \big|
-        \widehat{S}_{\text{obs}}(t) - \widetilde{S}_{\text{sim}}^{(s)}(t)
-    \big|\,
-    \mathrm{d}t,
-\)
-which we discretize by the trapezoidal rule on the grid $\{\tau_m\}$.
-Averaging across the $S$ simulations gives the regularizer
-\[
-    \mathcal{L}_{\text{NA-W}}(\theta_1, \theta_2)
     \;=\;
-    \frac{1}{S} \sum_{s=1}^{S}
-        W_1\!\left(\widehat{S}_{\text{obs}},\, \widetilde{S}_{\text{sim}}^{(s)}\right).
+    \int_{0}^{\infty}
+        \big|
+            \widehat{S}_{\text{obs}}(t) - \widetilde{S}_{\text{sim}}^{(s)}(t)
+        \big|\,
+    \mathrm{d}t,
 \]
-The total training objective is
-\[
+which we discretize on $\{\tau_m\}$ with the trapezoidal rule. Averaging over
+$S$ simulations gives the regularizer
+\(
+    \mathcal{L}_{\text{NA-W}}(\theta_1, \theta_2)
+    =
+    \frac{1}{S} \sum_{s=1}^{S}
+        W_1\!\left(\widehat{S}_{\text{obs}},\, \widetilde{S}_{\text{sim}}^{(s)}\right),
+\)
+and the total training objective is
+\begin{equation}
     \mathcal{L}(\theta_1, \theta_2)
     \;=\;
     \mathcal{L}_{\text{MLE}}(\theta_1, \theta_2)
     \;+\;
     \lambda \cdot \mathcal{L}_{\text{NA-W}}(\theta_1, \theta_2),
-\]
-with regularization strength $\lambda > 0$ tuned on a held-out split.
+    \label{eq:total}
+\end{equation}
+with $\lambda = 0.2$ and $S = 3$ in all experiments.
 
 \subsection{Differentiable sampling via implicit reparameterization}
 \label{sec:samp}
 
-Computing $\mathcal{L}_{\text{NA-W}}$ requires backpropagating through samples
-$T_i^{(s)} = h_{\theta_1}^{-1}(\tau_1^{(s,i)};\, Z_i)$ and analogously for $C$.
-Because the inverse of~\eqref{eq:flow} has no closed form, we evaluate it by
-$40$ steps of vectorized bisection on $\log t \in [\log t_{\min},\, \log t_{\max}]$
-inside a \texttt{torch.no\_grad} block, returning a numerically accurate
-$\log t^{*}$. The bisection has zero gradient with respect to $\theta$, so a
-naive implementation would block backpropagation through the regularizer
-entirely. We instead reattach the gradient via the implicit-function
-construction of \citet{figurnov2018implicit}: define
+Computing $\mathcal{L}_{\text{NA-W}}$ requires backpropagating through the
+samples
+$T_i^{(s)} = h_{\theta_1}^{-1}(U_T^{(s, i)};\, Z_i)$ and similarly for $C$.
+Because the inverse of~\eqref{eq:flow} has no closed form, we evaluate it
+numerically and reattach the gradient via the
+implicit-function construction of \citet{figurnov2018implicit}.
+
+\paragraph{Inverse via vectorized bisection.}
+Given a base draw $u \in \mathbb{R}$ and a covariate $z$, we seek
+$\log t^{*}$ such that $h_\theta(\log t^{*};\, z) = u$. We initialize
+$[\ell_0, h_0] = [\log t_{\min},\, \log t_{\max}]$ on the entire batch and
+run $40$ steps of vectorized bisection,
+\[
+    m_k = \tfrac{1}{2}(\ell_k + h_k),
+    \quad
+    \ell_{k+1} = \begin{cases} m_k & h_\theta(m_k; z) < u \\ \ell_k & \text{else}\end{cases},
+    \quad
+    h_{k+1} = \begin{cases} h_k & h_\theta(m_k; z) < u \\ m_k & \text{else}\end{cases},
+\]
+returning $\log t^{*} = \tfrac{1}{2}(\ell_{40} + h_{40})$. The whole loop is
+wrapped in \texttt{torch.no\_grad}, so it has zero gradient with respect to
+$\theta$ and zero memory cost in the autograd graph. After $40$ iterations
+the bracket width is $|h_{40} - \ell_{40}| \le |\log t_{\max} - \log t_{\min}|\, 2^{-40}
+\approx 10^{-12}\,|\log t_{\max} - \log t_{\min}|$ in the worst case, far below
+single-precision noise on $\log t^{*}$. This gives a numerically accurate
+inverse but blocks gradient flow into the flow regularizer entirely.
+
+\paragraph{Reattaching gradients.}
+Because $h_\theta(\log t^{*};\, z) = u$ is an identity in $\theta$, the
+implicit function theorem yields
+$\partial \log t^{*} / \partial \theta
+ = -(\partial h_\theta / \partial \theta) / h'_\theta$,
+both evaluated at $\log t^{*}$. We realize this gradient via a one-line
+substitution:
 \begin{equation}
     \log t^{\diamond}
     \;=\;
@@ -242,42 +315,87 @@ construction of \citet{figurnov2018implicit}: define
     \frac{
         h_\theta\!\left(\log t^{*};\, z\right) - u
     }{
-        \operatorname{stop\_grad}\!\left(\partial h_\theta / \partial \log t\,(\log t^{*};\, z)\right)
+        \operatorname{stop\_grad}\!\left(h'_\theta(\log t^{*};\, z)\right)
     }.
     \label{eq:implicit}
 \end{equation}
-Numerically $\log t^{\diamond} = \log t^{*}$ to floating-point precision, but
-its derivative with respect to $\theta$ equals the exact implicit gradient
-$-(\partial h_\theta/\partial \theta) / (\partial h_\theta/\partial \log t)$
-evaluated at $\log t^{*}$. Substituting $T = \exp(\log t^{\diamond})$ in the
-regularizer therefore yields exact gradients through the inverse without
-solving any system of equations and without unrolling the bisection. The same
-construction is used for $C$.
+Numerically $\log t^{\diamond} = \log t^{*}$ to floating-point precision,
+because $h_\theta(\log t^{*};\, z) = u$ at the bisection optimum. But the
+autograd derivative of~\eqref{eq:implicit} with respect to $\theta$ equals
+$-(\partial h_\theta / \partial \theta) / h'_\theta$ evaluated at
+$\log t^{*}$, which is exactly the implicit-function gradient: the numerator
+contributes $\partial h_\theta / \partial \theta$ through the (non-stopped)
+forward call $h_\theta(\log t^{*};\, z)$, the denominator is stopped, and the
+constant subtraction $\operatorname{stop\_grad}(\log t^{*})$ contributes
+nothing to the gradient. Substituting $T = \exp(\log t^{\diamond})$ in the
+regularizer therefore yields exact gradients without solving any system of
+equations and without unrolling the bisection.
 
-\paragraph{Direction of computation.}
-We emphasize that the training-time \emph{forward} direction in this
-construction is $\log t \mapsto u$ (Equation~\eqref{eq:flow}), so the
-likelihood
-in~\eqref{eq:logpdf}--\eqref{eq:logsurv} is closed-form and never requires the
-inverse: the likelihood needs only $h_\theta$ and its Jacobian, both of which
-are explicit. The inverse is invoked exclusively for sampling, where the
-implicit-reparameterization trick~\eqref{eq:implicit} provides exact
-gradients. This is in contrast to flow constructions that train through the
-inverse with bisection, in which the derivative of the inverse must be
-recovered, often incorrectly, by automatic differentiation through the
-bisection itself.
+\paragraph{Training direction is forward, sampling direction is inverse.}
+We emphasize the asymmetry: in the censored MLE
+of~\eqref{eq:censmle}--\eqref{eq:logpdf}--\eqref{eq:logsurv}, the forward
+direction is $\log t \mapsto u$, which is the closed-form direction of our
+flow, so the likelihood needs only $h_\theta$ and its analytical Jacobian and
+\emph{never} invokes the inverse. The inverse is invoked only in the
+regularizer, where samples are generated by bisection and reattached to
+gradients via~\eqref{eq:implicit}. This is in contrast to flow constructions
+that compute the likelihood through the inverse direction with bisection,
+where the derivative of the inverse must additionally be recovered (often
+incorrectly) by automatic differentiation through the bisection itself; we
+have observed this failure mode in a sibling implementation that motivated
+the design here.
 
-\subsection{Implementation details}
-\label{sec:impl}
+\subsection{Optimization}
+\label{sec:opt}
 
-The MLP feeding the flow heads has two hidden layers of width $32$ with
-$\tanh$ nonlinearities, and the flow uses $K=4$ tanh components. We train
-with Adam at learning rate $10^{-3}$, gradient clipping at $\ell_2$-norm $5$,
-batch size equal to the training-set size, regularizer weight $\lambda = 0.2$,
-$S=3$ Monte~Carlo simulations per batch, soft temperatures
-$\tau_{\text{temp}} = 0.25$ and $\alpha = 0.20$, and a Nelson--Aalen grid of
-$M = 80$ points spanning the empirical $1$\textsuperscript{st}--$99$\textsuperscript{th}
-percentile of the observed $X$. Time is clipped to
-$[10^{-4},\, 10]$ for both true and simulated samples. We early-stop on the
-training objective with patience $35$ and a relative tolerance of $10^{-4}$.
-A reference implementation is provided in the supplementary material.
+We optimize~\eqref{eq:total} with full-batch Adam at learning rate $10^{-3}$
+on the joint parameter set $\theta_1 \cup \theta_2$. After each backward pass
+we apply gradient clipping at $\ell_2$-norm $5$ jointly to both flows; the
+clip is rarely active at convergence but eliminates the rare exploding-gradient
+events that occur in the first few epochs when the implicit gradient
+in~\eqref{eq:implicit} is evaluated near a still-flat $h'_\theta$. We early-stop
+on the training objective with patience $35$ and a relative tolerance of
+$10^{-4}$, restoring the best-loss state at the end of training. Total
+training time is approximately $20$ seconds per Monte Carlo replication on a
+single CPU core for $n = 384$, $K = 4$, $S = 3$, and a maximum of $220$
+epochs; convergence typically occurs around epoch $200$ and is uniform across
+seeds.
+
+\subsection{Hyperparameters}
+\label{sec:hp}
+
+For reproducibility, Table~\ref{tab:hp} lists every hyperparameter used in
+the experiments of Section~\ref{sec:sim}. All values are shared across the
+four data-generating processes and across all Monte Carlo replications;
+nothing is tuned per scenario.
+
+\begin{table}[t]
+\caption{Hyperparameters for the conditional flow (\texttt{MonotoneFlow1D}).}
+\label{tab:hp}
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Symbol & Value & Meaning \\
+\midrule
+$d$               & $1$ & covariate dimension in our simulations \\
+hidden width      & $32$ & MLP $\psi_\theta$ hidden width (two layers) \\
+$K$               & $4$ & number of tanh components in~\eqref{eq:flow} \\
+$a_0$             & $0.10$ & shift in softplus reparam of $a(z)$ \\
+$s_0$             & $0.20$ & shift in softplus reparam of $s_k(z)$ \\
+$\alpha_{\max}$   & $0.5$ & scale on softplus reparam of $\alpha_k(z)$ \\
+$[t_{\min}, t_{\max}]$ & $[10^{-4},\, 10]$ & training time clip \\
+$M$               & $80$ & Nelson--Aalen grid size \\
+$S$               & $3$ & MC simulations per batch in $\mathcal{L}_{\text{NA-W}}$ \\
+$\tau_{\text{temp}}$ & $0.25$ & soft event-indicator temperature \\
+$\alpha$          & $0.20$ & soft at-risk / event-window temperature \\
+$\lambda$         & $0.2$ & weight of $\mathcal{L}_{\text{NA-W}}$ in~\eqref{eq:total} \\
+optimizer         & Adam, lr $10^{-3}$ & full-batch \\
+grad clip ($\ell_2$) & $5.0$ & joint over both flows \\
+max epochs        & $220$ & with early stop \\
+patience          & $35$ & early-stop patience \\
+min$\Delta$       & $10^{-4}$ & early-stop relative tolerance \\
+bisection iters   & $40$ & inverse evaluation in Section~\ref{sec:samp} \\
+\bottomrule
+\end{tabular}
+\end{table}
