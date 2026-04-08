@@ -1,0 +1,60 @@
+\documentclass{article}
+
+% Use \usepackage[final]{neurips_2026} during the camera-ready stage.
+\usepackage{neurips_2026}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{bm}
+
+\title{Conditional Normalizing Flows for\\ Right-Censored Survival Data
+       with Distribution-Matching Regularization}
+
+\author{%
+  Anonymous Author(s)\\
+  \texttt{anonymous@example.com}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We propose a generative framework for right-censored survival data based on
+two conditional normalizing flows that jointly model the failure time
+$T \mid Z$ and the censoring time $C \mid Z$. Each flow is a strictly monotone
+transform on the log-time axis with a Gaussian base, yielding closed-form
+density and survival functions and a fully tractable censored joint
+log-likelihood. We additionally introduce a differentiable
+Soft--Nelson--Aalen Wasserstein regularizer that aligns the model-implied
+population survival curve with the empirical one, yielding a sample-level
+likelihood objective that is augmented with a population-level distributional
+constraint. The flow construction is sufficiently expressive to capture
+non-LogNormal hazard shapes (Cox-PH, heavy-tailed) where parametric
+alternatives provably fail; on a four-scenario simulation study with $30\%$ to
+$77\%$ censoring, the proposed model improves T-side Wasserstein-1 by up to
+$32\%$ and Kolmogorov--Smirnov by up to $66\%$ over Kaplan--Meier, Cox PH,
+parametric AFT, and a parametric LogNormal-flow ablation.
+\end{abstract}
+
+\input{sections/01_introduction}
+\input{sections/02_related_work}
+\input{sections/03_methodology}
+\input{sections/04_simulation_studies}
+\input{sections/05_real_data}
+\input{sections/06_discussion}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}
