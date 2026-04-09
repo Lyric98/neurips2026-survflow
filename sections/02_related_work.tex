@@ -1,5 +1,92 @@
 \section{Related Work}
 \label{sec:related}
 
-% TODO: cite Sylvain et al. 2021 (Wasserstein for survival), Durkan 2019 (NSF),
-% Figurnov 2018 (implicit reparameterization), classical Cox/KM, Deep CTM.
+Our work sits at the intersection of three lines: classical and semiparametric
+models for dependent censoring, deep generative survival analysis, and
+distribution-matching regularizers built on Nelson--Aalen-style estimators.
+
+\paragraph{Classical and copula-based dependent censoring.}
+The non-identifiability of the joint distribution of $(T, C)$ from right-censored
+observations has been known since \citet{tsiatis1975nonidentifiability}: without
+structural assumptions, the marginal of $T$ is not uniquely recoverable when
+$T$ and $C$ are dependent. The dominant statistical response has been to
+impose a parametric copula on $(T, C)$ together with parametric marginals and
+to prove identifiability under those joint assumptions. \citet{czado2023dependent}
+characterize identifiability in this setting through tail-density ratio conditions
+on the marginals (their Condition C1) and tail-derivative conditions on the
+copula (their Condition C2), and show that Condition C1 is satisfied by the
+Weibull, log-normal, log-logistic, and log-Student families. The same authors'
+\textsc{depCensoring} R package provides reference implementations of these
+estimators. \citet{deresa2021semiparametric} relax the parametric marginal
+assumption to a semiparametric normal transformation model, in which $(h(T), h(C))$
+follows a bivariate normal distribution with possibly non-diagonal covariance
+after a nonparametric monotone transformation $h$, and prove that the model
+is identifiable with consistent and asymptotically normal estimators. More
+recent extensions move toward covariate-dependent copulas via gradient boosting
+\citep{verstraete2025boosting} and quantile regression formulations
+\citep{debacker2025quantile}.
+
+Two design choices distinguish this entire line from the deep generative
+methods (including ours): (i) the dependence between $T$ and $C$ is encoded
+explicitly through a copula or a fixed bivariate latent law, and (ii) the
+marginal model class is constrained enough to admit closed-form identifiability
+arguments. Our work trades the explicit copula for an implicit
+shared-latent encoding via a normalizing flow; we discuss the resulting
+identifiability gap and a path to closing it via the C1/C2 framework in
+Section~\ref{sec:identifiability}.
+
+\paragraph{Deep generative survival analysis.}
+Conditional generative models for survival data have proliferated in the
+last five years. \citet{nagpal2021dsm} (Deep Survival Machines) parameterize
+the conditional density of $T \mid Z$ as a learnable mixture of LogNormal or
+Weibull components, trained by censored maximum likelihood. \citet{ausset2021conditional}
+were among the first to apply conditional normalizing flows to survival data,
+working in the uninformative-censoring regime with a $T$-only model.
+\citet{lee2018deephit} (DeepHit) and \citet{tang2022soden} (SODEN) use
+discrete-time hazards and ODE-based hazards, respectively. \citet{norcliffe2023survivalgan}
+explore GAN-style generative survival modeling. None of these works explicitly
+handle informative censoring with a joint generative model.
+
+The most closely related deep methods for \emph{dependent} censoring are
+\citet{ding2023copula} and the subsequent \citet{zhang2024deepcopula}
+(\textsc{DCSurvival}). Both use deep neural networks to parameterize the
+marginal distributions of $T$ and $C$ but retain an explicit Archimedean
+copula head to model the dependence. \textsc{DCSurvival} establishes
+identifiability of its model by directly invoking the Czado--Van Keilegom
+Theorem~3 \citep{czado2023dependent}, leveraging the fact that the deep
+marginals (Weibull / log-normal heads) satisfy Condition C1. \citet{lillelund2024mensa}
+(\textsc{MENSA}) extends the deep multi-event setting to informative censoring
+through joint mixture-marginal parametrizations, but does not address
+identifiability. Compared to all three of these, our method differs in two
+ways: we replace the explicit copula with a shared-latent variable, and we
+allow the marginal flow to be strictly more expressive than any
+log-location-scale family.
+
+\paragraph{Wasserstein- and Nelson--Aalen-based regularization for survival.}
+\citet{sylvain2021wasserstein} introduced a Wasserstein metric between
+Kaplan--Meier-imputed CDFs as a discriminative loss for survival prediction.
+Our Soft--Nelson--Aalen Wasserstein regularizer is generative rather than
+discriminative: it matches the model-implied population survival curve to the
+empirical one through differentiable sampling, allowing the regularizer to
+backpropagate end-to-end into both the marginal flows and (in the informative
+case) the shared-latent encoding. The use of differentiable sampling through
+implicit reparameterization, in the sense of \citet{figurnov2018implicit},
+is what makes the Soft--NA + Wasserstein objective trainable in the flow
+setting; without it, the bisection-based inverse of the flow blocks gradient
+flow into the flow parameters.
+
+\paragraph{Position of this work.}
+We are, to our knowledge, the first to propose a real conditional normalizing
+flow for joint $(T, C)$ modeling under both uninformative and informative
+right censoring, with closed-form censored MLE in the forward direction and
+exact-gradient differentiable sampling in the inverse direction via implicit
+reparameterization. Compared to copula-based statistical methods
+\citep{czado2023dependent,deresa2021semiparametric,zhang2024deepcopula}, our
+method does not specify a copula family and admits a strictly more flexible
+marginal class. Compared to deep generative survival baselines that target
+only the uninformative regime \citep{nagpal2021dsm,ausset2021conditional,
+norcliffe2023survivalgan}, we handle the shared-frailty informative censoring
+case through Monte Carlo marginalization of the latent variable. We discuss
+the price of dropping the explicit copula --- the loss of a closed-form
+identifiability proof --- in Section~\ref{sec:identifiability}, where we
+sketch an extension of the Czado--Van Keilegom C1 condition to our flow class.
