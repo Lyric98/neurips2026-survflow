@@ -65,11 +65,16 @@ log-location-scale family.
 \paragraph{Wasserstein- and Nelson--Aalen-based regularization for survival.}
 \citet{sylvain2021wasserstein} introduced a Wasserstein metric between
 Kaplan--Meier-imputed CDFs as a discriminative loss for survival prediction.
+\citet{zhou2024wkm} subsequently developed Wasserstein--Kaplan--Meier
+survival regression, in which Kaplan--Meier curves are treated as
+Wasserstein-space objects and regressed against covariates through a
+Fr\'echet regression framework, providing the first principled
+distribution-on-distribution interpretation of the Wasserstein--KM objective.
 Our Soft--Nelson--Aalen Wasserstein regularizer is generative rather than
-discriminative: it matches the model-implied population survival curve to the
-empirical one through differentiable sampling, allowing the regularizer to
-backpropagate end-to-end into both the marginal flows and (in the informative
-case) the shared-latent encoding. The use of differentiable sampling through
+discriminative or regression-based: it matches the model-implied population
+survival curve to the empirical one through differentiable sampling, allowing
+the regularizer to backpropagate end-to-end into both the marginal flows and
+(in the informative case) the shared-latent encoding. The use of differentiable sampling through
 implicit reparameterization, in the sense of \citet{figurnov2018implicit},
 is what makes the Soft--NA + Wasserstein objective trainable in the flow
 setting; without it, the bisection-based inverse of the flow blocks gradient
