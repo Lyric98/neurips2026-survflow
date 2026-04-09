@@ -345,21 +345,173 @@ incorrectly) by automatic differentiation through the bisection itself; we
 have observed this failure mode in a sibling implementation that motivated
 the design here.
 
+\subsection{Extension to informative censoring via a shared latent variable}
+\label{sec:informative}
+
+The construction of Sections~\ref{sec:flow}--\ref{sec:samp} assumes
+$T \perp C \mid Z$. We now extend the model to the informative censoring
+regime, in which $T$ and $C$ remain dependent even after conditioning on
+$Z$. Following the shared-noise construction in the survival literature, we
+introduce a single one-dimensional latent variable $\varepsilon \sim \mathcal{N}(0, 1)$
+shared between the two time channels:
+\[
+    T \;=\; g_1(Z,\, \varepsilon,\, \eta_1),
+    \qquad
+    C \;=\; g_2(Z,\, \varepsilon,\, \eta_2),
+    \qquad
+    \eta_1, \eta_2 \sim \mathcal{N}(0, 1)\text{ independent},
+\]
+where $g_1, g_2$ are the inverses of two flows from
+Section~\ref{sec:flow} with the conditional context augmented from $z$ to
+$(z, \varepsilon)$. Conditional on $(Z, \varepsilon)$, the two flows remain
+independent and the closed-form likelihood formulas
+\eqref{eq:logpdf}--\eqref{eq:logsurv} apply unchanged. The marginal
+likelihood of an observation $(x, \delta, z)$ is the integral over the
+shared latent,
+\begin{equation}
+    \mathcal{L}_i
+    \;=\;
+    \int_{\mathbb{R}}
+        \Big(f_{T \mid Z, \varepsilon}(x \mid z, \varepsilon)\,
+              S_{C \mid Z, \varepsilon}(x \mid z, \varepsilon)\Big)^{\delta_i}
+        \Big(S_{T \mid Z, \varepsilon}(x \mid z, \varepsilon)\,
+              f_{C \mid Z, \varepsilon}(x \mid z, \varepsilon)\Big)^{1 - \delta_i}
+        \,\phi(\varepsilon)\,
+    \mathrm{d}\varepsilon,
+    \label{eq:marg-mle}
+\end{equation}
+which we approximate by Monte Carlo with $K_\varepsilon$ standard-normal
+samples and a log-sum-exp aggregator,
+\begin{equation}
+    \log \widehat{\mathcal{L}}_i
+    \;=\;
+    \operatorname{LogSumExp}\!\left(
+        \log L_{i, 1},\, \dots,\, \log L_{i, K_\varepsilon}
+    \right)
+    \;-\;
+    \log K_\varepsilon,
+    \label{eq:lse}
+\end{equation}
+where $\log L_{i, k}$ is the censored log-likelihood
+contribution~\eqref{eq:censmle} evaluated at the $k$th draw of $\varepsilon$.
+The objective in this regime is
+\(
+    \mathcal{L}_{\text{MLE-inf}}
+    = -\frac{1}{n} \sum_{i=1}^n \log \widehat{\mathcal{L}}_i,
+\)
+and the Soft--NA Wasserstein regularizer of Section~\ref{sec:reg} is added
+unchanged after replacing the conditional sampling step with a fresh
+$\varepsilon$ draw at each Monte Carlo simulation index $s$. We use
+$K_\varepsilon = 16$ for the rho-sweep experiments and $K_\varepsilon = 32$
+for the large-scale final run; ablation in Section~\ref{sec:sim} shows the
+result is insensitive to $K_\varepsilon \ge 8$.
+
+\paragraph{Numerical stability of the marginal MLE.}
+The Monte Carlo integral~\eqref{eq:marg-mle} is computed entirely in the
+log domain via PyTorch's \texttt{logsumexp} primitive, never reaching the
+probability domain where individual $\exp$ terms would underflow.
+Equation~\eqref{eq:lse} is therefore exact for any $K_\varepsilon \ge 1$
+modulo Monte Carlo variance, and the gradient through the marginalized
+loss is the standard score-function-style estimator obtained by
+backpropagating through the LogSumExp.
+
+\subsection{Identifiability discussion}
+\label{sec:identifiability}
+
+The non-identifiability of the joint distribution of $(T, C)$ from
+right-censored observations is a classical obstruction
+\citep{tsiatis1975nonidentifiability}: without structural assumptions on
+the joint, the marginal of $T$ is not uniquely recoverable when $T$ and
+$C$ are dependent. The dominant statistical response has been to specify
+a parametric copula on $(T, C)$ together with parametric marginals and to
+prove identifiability under those joint assumptions
+\citep{czado2023dependent,deresa2021semiparametric}. The state-of-the-art
+deep formulation in this line, \textsc{DCSurvival} \citep{zhang2024deepcopula},
+inherits identifiability by directly invoking
+\citet{czado2023dependent}'s Theorem~3, which requires two tail conditions:
+\begin{itemize}
+    \item \textbf{(C1)} For all parameter values in the respective spaces,
+        the limit
+        $\displaystyle \lim_{t \to 0^+} f_{T,\theta_1}(t) / f_{T,\theta_2}(t) = 1$
+        implies $\theta_1 = \theta_2$, and analogously for the censoring
+        margin.
+    \item \textbf{(C2)} The first-order partial derivatives of the copula,
+        evaluated at $(S_T(t), S_C(t))$, both tend to $1$ as $t \to 0^+$.
+\end{itemize}
+\citet{czado2023dependent}'s Theorem~4 establishes that (C1) holds for the
+log-normal, Weibull, log-logistic, and log-Student families.
+
+\paragraph{Why our flow class admits the same identifiability argument.}
+Our forward map~\eqref{eq:flow} is a strictly monotone transform on
+$\log t$ that, in the special case $K = 0$, reduces to
+$h_{\text{LN}}(\log t; z) = a(z) \log t + b(z)$, which is exactly the
+conditional log-normal model. For $K \ge 1$, the additional tanh components
+in~\eqref{eq:flow} are bounded:
+$\big|\sum_k \alpha_k(z) \tanh((\log t - \mu_k(z)) / s_k(z))\big|
+\le \sum_k \alpha_k(z) \le K \alpha_{\max}$.
+As $t \to 0^+$, every $\tanh$ argument tends to $-\infty$ and saturates at
+$-1$, so the sum converges to a constant
+$-\sum_k \alpha_k(z)$ that depends only on $z$, not on $t$. Substituting
+into~\eqref{eq:logpdf} gives the asymptotic
+\begin{align*}
+    \log f_{T \mid Z}(t \mid z)
+    &\;=\; \log \phi\!\left(a(z) \log t + b(z) - \textstyle\sum_k \alpha_k(z) + o(1)\right)
+    \;+\; \log a(z) \;-\; \log t \;+\; o(1) \\
+    &\;=\; -\tfrac{1}{2}\big(a(z) \log t + b'(z)\big)^2 \;-\; \log t \;+\; \mathrm{const}(z) \;+\; o(1),
+\end{align*}
+where $b'(z) = b(z) - \sum_k \alpha_k(z)$. The leading term is exactly the
+log-density of a conditional log-normal with parameters $(b'(z), 1/a(z))$.
+The ratio $f_{T, \theta_1}(t) / f_{T, \theta_2}(t)$ as $t \to 0^+$ is
+therefore identical to the corresponding log-normal ratio up to a $1 + o(1)$
+factor, and the log-normal version of (C1) is proved by
+\citet{czado2023dependent} (Theorem~4). Hence (C1) carries over to our
+flow class. Condition (C2) is a property of the copula, not the marginals;
+because the shared-latent encoding induces a continuous copula whose
+derivatives have well-defined tail limits under standard regularity
+conditions on the flow networks (which we satisfy by the softplus reparam
+shifts $a_0, s_0 > 0$), (C2) holds in our setting as well.
+
+We summarize the consequence as a non-formal corollary, deferring the full
+proof to Appendix~\ref{app:identifiability}.
+
+\begin{quote}
+\textit{Corollary (informal).}
+The conditional flow model of Section~\ref{sec:flow} combined with the
+shared-latent informative censoring extension of
+Section~\ref{sec:informative} is identifiable in the sense of
+\citet{czado2023dependent}: if two parameter settings produce the same
+distribution over the observable $(\min(T, C), \delta, Z)$, they coincide.
+\end{quote}
+
+\paragraph{Empirical validation.}
+We complement the asymptotic argument above with a direct empirical check
+in Section~\ref{sec:sim}: under varying dependence strengths
+$\rho \in \{0,\, 0.5,\, 1\}$ on a Cox-PH-with-Gamma-frailty
+data-generating process, our model recovers the true marginal distribution
+of $T$ to within sampling noise of the Kaplan--Meier baseline, with the
+flow strictly improving over KM at $\rho \in \{0,\, 1\}$ and matching it at
+$\rho = 0.5$. We additionally inspect the model's empirical CDF for any
+systematic directional bias and find none beyond per-seed Monte Carlo
+noise (mean signed deviation $< 0.011$ in every quartile of the time
+grid).
+
 \subsection{Optimization}
 \label{sec:opt}
 
-We optimize~\eqref{eq:total} with full-batch Adam at learning rate $10^{-3}$
-on the joint parameter set $\theta_1 \cup \theta_2$. After each backward pass
-we apply gradient clipping at $\ell_2$-norm $5$ jointly to both flows; the
-clip is rarely active at convergence but eliminates the rare exploding-gradient
-events that occur in the first few epochs when the implicit gradient
-in~\eqref{eq:implicit} is evaluated near a still-flat $h'_\theta$. We early-stop
-on the training objective with patience $35$ and a relative tolerance of
-$10^{-4}$, restoring the best-loss state at the end of training. Total
-training time is approximately $20$ seconds per Monte Carlo replication on a
-single CPU core for $n = 384$, $K = 4$, $S = 3$, and a maximum of $220$
-epochs; convergence typically occurs around epoch $200$ and is uniform across
-seeds.
+We optimize the total objective with full-batch Adam at learning rate
+$10^{-3}$ on the joint parameter set $\theta_1 \cup \theta_2$ (extended to
+include the latent context heads under the informative regime). After
+each backward pass we apply gradient clipping at $\ell_2$-norm $5$ jointly
+to both flows; the clip is rarely active at convergence but eliminates
+the rare exploding-gradient events that occur in the first few epochs
+when the implicit gradient in~\eqref{eq:implicit} is evaluated near a
+still-flat $h'_\theta$. We early-stop on the training objective with
+patience $35$--$50$ and a relative tolerance of $10^{-4}$, restoring the
+best-loss state at the end of training. Total training time is
+approximately $20$ seconds per Monte Carlo replication on a single CPU
+core at $n_{\text{train}} = 384$, scaling near-linearly to roughly $300$
+seconds at $n_{\text{train}} = 2048$; convergence typically occurs around
+epoch $130$--$400$ depending on the regime and is uniform across seeds.
 
 \subsection{Hyperparameters}
 \label{sec:hp}
@@ -389,11 +541,12 @@ $M$               & $80$ & Nelson--Aalen grid size \\
 $S$               & $3$ & MC simulations per batch in $\mathcal{L}_{\text{NA-W}}$ \\
 $\tau_{\text{temp}}$ & $0.25$ & soft event-indicator temperature \\
 $\alpha$          & $0.20$ & soft at-risk / event-window temperature \\
-$\lambda$         & $0.2$ & weight of $\mathcal{L}_{\text{NA-W}}$ in~\eqref{eq:total} \\
+$\lambda$         & $0.2$ & weight of $\mathcal{L}_{\text{NA-W}}$ \\
+$K_\varepsilon$   & $\{16,\, 32\}$ & MC samples for marginal MLE (informative only)\\
 optimizer         & Adam, lr $10^{-3}$ & full-batch \\
 grad clip ($\ell_2$) & $5.0$ & joint over both flows \\
-max epochs        & $220$ & with early stop \\
-patience          & $35$ & early-stop patience \\
+max epochs        & $\{220, 300, 400\}$ & by experiment scale, with early stop \\
+patience          & $\{35, 40, 50\}$ & early-stop patience \\
 min$\Delta$       & $10^{-4}$ & early-stop relative tolerance \\
 bisection iters   & $40$ & inverse evaluation in Section~\ref{sec:samp} \\
 \bottomrule
