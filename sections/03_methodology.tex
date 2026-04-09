@@ -124,11 +124,13 @@ Three implementation details prevent the well-known numerical failure modes
 in the upper and lower tails of the likelihood:
 \begin{itemize}
     \item In~\eqref{eq:logsurv} we evaluate $\log \Phi(-h)$ via
-          \texttt{torch.special.ndtr} on the negated argument, which uses the
-          symmetry $\Phi(-h) = 1 - \Phi(h)$ implicitly and avoids the
-          catastrophic cancellation that would otherwise occur as
-          $h \to +\infty$. The result is then clamped from below by
-          $10^{-12}$ before the logarithm.
+          \texttt{torch.special.log\_ndtr}, which directly computes the
+          log-CDF of the standard normal at the negated argument. This
+          avoids both the catastrophic cancellation that would otherwise
+          occur as $h \to +\infty$ in a $\log(1 - \Phi(h))$ formulation and
+          the gradient saturation that occurs in a $\log(\max(\Phi(-h), \varepsilon))$
+          clamp formulation, giving exact gradients across the full real
+          line.
     \item In~\eqref{eq:logpdf} the Jacobian $h'_\theta$ is clamped from
           below by $10^{-12}$ before the logarithm. The clamp is never active
           at convergence because $h'_\theta \ge a_0 = 0.10$, but it makes
@@ -501,17 +503,41 @@ grid).
 We optimize the total objective with full-batch Adam at learning rate
 $10^{-3}$ on the joint parameter set $\theta_1 \cup \theta_2$ (extended to
 include the latent context heads under the informative regime). After
-each backward pass we apply gradient clipping at $\ell_2$-norm $5$ jointly
-to both flows; the clip is rarely active at convergence but eliminates
-the rare exploding-gradient events that occur in the first few epochs
-when the implicit gradient in~\eqref{eq:implicit} is evaluated near a
-still-flat $h'_\theta$. We early-stop on the training objective with
-patience $35$--$50$ and a relative tolerance of $10^{-4}$, restoring the
-best-loss state at the end of training. Total training time is
-approximately $20$ seconds per Monte Carlo replication on a single CPU
-core at $n_{\text{train}} = 384$, scaling near-linearly to roughly $300$
-seconds at $n_{\text{train}} = 2048$; convergence typically occurs around
-epoch $130$--$400$ depending on the regime and is uniform across seeds.
+each backward pass we apply gradient clipping at $\ell_2$-norm $2$
+jointly to both flows; the clip is rarely active at convergence but
+eliminates the rare exploding-gradient events that occur in the first
+few epochs when the implicit gradient in~\eqref{eq:implicit} is
+evaluated near a still-flat $h'_\theta$.
+
+\paragraph{Gauge-fixing penalty.}
+To resolve the parameter redundancy identified in
+Appendix~\ref{app:identifiability} (Assumption (A3)) at the level of
+training, we add a small penalty
+\begin{equation}
+    \mathcal{L}_{\text{gauge}}(\theta)
+    \;=\; \lambda_\alpha \cdot
+    \mathbb{E}_z\!\left[\Big(\sum_{k=1}^{K} \alpha_k(z, \varepsilon)\Big)^2\right],
+    \label{eq:gauge}
+\end{equation}
+applied independently to each of the two flows, with default weight
+$\lambda_\alpha = 0.01$. The expectation is taken over the training
+batch. This penalty is symmetry-breaking on the gauge direction
+$(b, \alpha_k) \mapsto (b + c, \alpha_k + c/K)$ but vanishes on-shell
+because the optimal $\alpha_k$ for the censored MLE remains small in all
+DGPs we test --- the penalty is therefore inactive on the well-fit T
+side and active only on the over-parameterized C side under DGPs where
+the conditional log-normal $K = 0$ special case is itself the oracle.
+The penalty is the practical realization of the theoretical gauge fix in
+Section~\ref{app:scope} and the empirical fix for the heavy-tail-$t$
+$C$-side outlier reported in Section~\ref{sec:sim-uninf}.
+
+We early-stop on the training objective with patience $35$--$50$ and a
+relative tolerance of $10^{-4}$, restoring the best-loss state at the
+end of training. Total training time is approximately $20$ seconds per
+Monte Carlo replication on a single CPU core at $n_{\text{train}} = 384$,
+scaling near-linearly to roughly $300$ seconds at $n_{\text{train}} = 2048$;
+convergence typically occurs around epoch $130$--$400$ depending on the
+regime and is uniform across seeds.
 
 \subsection{Hyperparameters}
 \label{sec:hp}
@@ -542,9 +568,10 @@ $S$               & $3$ & MC simulations per batch in $\mathcal{L}_{\text{NA-W}}
 $\tau_{\text{temp}}$ & $0.25$ & soft event-indicator temperature \\
 $\alpha$          & $0.20$ & soft at-risk / event-window temperature \\
 $\lambda$         & $0.2$ & weight of $\mathcal{L}_{\text{NA-W}}$ \\
+$\lambda_\alpha$  & $0.01$ & weight of $\mathcal{L}_{\text{gauge}}$~\eqref{eq:gauge} \\
 $K_\varepsilon$   & $\{16,\, 32\}$ & MC samples for marginal MLE (informative only)\\
 optimizer         & Adam, lr $10^{-3}$ & full-batch \\
-grad clip ($\ell_2$) & $5.0$ & joint over both flows \\
+grad clip ($\ell_2$) & $2.0$ & joint over both flows \\
 max epochs        & $\{220, 300, 400\}$ & by experiment scale, with early stop \\
 patience          & $\{35, 40, 50\}$ & early-stop patience \\
 min$\Delta$       & $10^{-4}$ & early-stop relative tolerance \\

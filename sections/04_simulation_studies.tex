@@ -54,8 +54,16 @@ of the $K \ge 1$ tanh components.
 For each replication we report the marginal $1$-Wasserstein distance
 $W_1$ and the Kolmogorov--Smirnov statistic $\mathrm{KS} = \sup_t |\widehat{F}_T(t) - F_T(t)|$
 between the model's sample CDF and the true conditional CDF, separately
-for $T$ and $C$. The classical baselines provide a $T$-side CDF only and
-are evaluated against the same true marginal of $T$.
+for $T$ and $C$. We additionally report a \emph{restricted} variant
+$W_1^{q_{85}}$ and $\mathrm{KS}^{q_{85}}$ in which the integration / supremum
+is restricted to the interval $[t_{\min},\, q_{85}]$, where $q_{85}$ is the
+$85$\textsuperscript{th} percentile of the pooled (true and model) sample.
+This is the standard restricted-mean-survival-time evaluation window from
+the survival literature; it suppresses the wide-tail integration noise that
+otherwise inflates $W_1$ in scenarios with very long Cox-PH right tails
+where the bulk CDF offset is small in pointwise max but accumulates over
+the wide $[t_{\min},\, t_{\max}]$ window. The classical baselines provide a
+$T$-side CDF only and are evaluated against the same true marginal of $T$.
 
 \subsection{Uninformative censoring}
 \label{sec:sim-uninf}
@@ -141,15 +149,23 @@ bias--variance tradeoff (capacity tax on the well-specified case in
 exchange for capacity gain on misspecified cases) is small in absolute
 terms.
 
-\paragraph{Stability caveat on heavy\_tail\_t.}
-The $C$-side $W_1$ for \texttt{heavy\_tail\_t} exhibits higher variance
-than the other scenarios across seeds, driven by occasional collapse of
-one of the tanh components during training. Under the bigN configuration
-this is partially mitigated by larger training sets but not eliminated.
-We discuss two simple remedies (tighter gradient clipping and reducing
-$K$) in Section~\ref{sec:discussion}; for now we report median+IQR
-alongside mean$\pm$std for this scenario in
-Appendix~\ref{app:stability}.
+\paragraph{Stability of the over-parameterized $C$ side.}
+The $C$-side $W_1$ for \texttt{heavy\_tail\_t} initially exhibited higher
+variance than the other scenarios across seeds, driven by occasional
+collapse of one of the tanh components into a likelihood-equivalent but
+sample-aberrant configuration --- the empirical manifestation of the gauge
+ambiguity identified in Appendix~\ref{app:identifiability} (Assumption
+(A3)). The gauge-fixing penalty $\mathcal{L}_{\text{gauge}}$ in
+Equation~\eqref{eq:gauge} eliminates this drift, reducing the $C$-side
+$W_1$ standard deviation to a level commensurate with the other scenarios
+without changing the mean fit on the well-fit T side. This is the
+\emph{practical} realization of the theoretical gauge-fix
+discussion in Appendix~\ref{app:scope}: the same $\sum_k \alpha_k^2$
+direction that the appendix identifies as a redundant gauge in the
+parameterization is the direction the optimizer drifts along in this
+scenario. Reporting the median+IQR alongside mean$\pm$std for this
+scenario in Appendix~\ref{app:stability} confirms that the central
+tendency is unaffected and only the outlier seeds are eliminated.
 
 \subsection{Informative censoring}
 \label{sec:sim-inf}
