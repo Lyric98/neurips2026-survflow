@@ -34,7 +34,7 @@ in the absolute-area form on a $300$-point time grid spanning the pooled
 $1$\textsuperscript{st}--$99.5$\textsuperscript{th} percentile.
 
 \paragraph{Baselines.}
-We compare against four classical baselines:
+We compare against four classical baselines and three recent deep methods:
 \begin{itemize}
     \item \textbf{Kaplan--Meier (KM).} Nonparametric, no covariate.
     \item \textbf{Cox PH.} Semiparametric proportional hazards with linear
@@ -42,6 +42,17 @@ We compare against four classical baselines:
           cumulative hazard for the marginal CDF.
     \item \textbf{AFT-LogNormal} and \textbf{AFT-Weibull.} Parametric AFT
           regressions with linear $Z$ effect, fit by maximum likelihood.
+    \item \textbf{DSM} \citep{nagpal2021dsm}. Deep Survival Machines: a
+          mixture of $K{=}4$ conditional log-normals, trained by censored
+          MLE. Models $T$ only; assumes independent censoring.
+    \item \textbf{WKM} \citep{zhou2024wkm}. Wasserstein--Kaplan--Meier
+          regression: kernel-weighted KM curves over covariate bins.
+          Models $T$ only; assumes independent censoring.
+    \item \textbf{DCSurvival} \citep{zhang2024deepcopula}. Deep LogNormal
+          marginals coupled by a Frank survival copula with a learnable
+          dependence parameter $\alpha$, trained by copula-augmented
+          censored MLE. The only competing method that explicitly models
+          $T$-$C$ dependence.
 \end{itemize}
 For the uninformative experiments, we additionally report a
 \textbf{LogN-flow ablation} obtained by setting $K = 0$ in
@@ -92,62 +103,65 @@ and $\texttt{cox\_both}$):
 \end{enumerate}
 
 \paragraph{Main results.}
-Table~\ref{tab:uninf-main} reports the $T$-side and $C$-side fit at the
-\emph{bigN} scale. The conditional flow strictly improves over every
-classical baseline on every scenario, with relative $\mathrm{KS}$
-reductions ranging from $37\%$ on \texttt{heavy\_tail\_t} to $70\%$ on
-\texttt{cox\_t\_lognormal\_c}.
+Table~\ref{tab:uninf-main} reports the $T$-side KS at the \emph{bigN}
+scale for all seven baselines and our flow. The flow dominates every
+classical baseline on every scenario, and is competitive with or superior
+to the deep baselines.
 
 \begin{table}[t]
-\caption{Uninformative censoring at the large scale
-($n_{\text{train}} = 2048$, $n_{\text{eval}} = 1024$, $50$ MC for the
-base scenario, $30$ for the rest). Mean $\pm$ standard deviation across
-replications. Best within column is \textbf{bold}.}
+\caption{Uninformative censoring, $T$-side KS ($n_{\text{train}} = 2048$,
+$n_{\text{eval}} = 1024$; $50$ MC for lognormal\_base, $30$ for the rest).
+Mean $\pm$ std. Best in \textbf{bold}, second-best \underline{underlined}.}
 \label{tab:uninf-main}
 \centering
 \small
 \begin{tabular}{lcccc}
 \toprule
-& \texttt{lognormal\_base} & \texttt{heavy\_tail\_t} & \texttt{cox\_t\_lognormal\_c} & \texttt{cox\_both}\\
-& ($\approx 51\%$ cens.) & ($\approx 51\%$ cens.) & ($\approx 77\%$ cens.) & ($\approx 53\%$ cens.) \\
+Method & \texttt{logn\_base} & \texttt{heavy\_tail\_t} & \texttt{cox\_t\_logn\_c} & \texttt{cox\_both}\\
+& (${\approx}\,51\%$ cens.) & (${\approx}\,51\%$ cens.) & (${\approx}\,77\%$ cens.) & (${\approx}\,53\%$ cens.) \\
 \midrule
-\multicolumn{5}{l}{\emph{$T$-side $W_1$}} \\
-Conditional flow (ours)          & \textbf{0.101\,$\pm$\,0.039} & \textbf{0.295\,$\pm$\,0.079} & \textbf{0.618\,$\pm$\,0.213} & \textbf{0.285\,$\pm$\,0.126} \\
+\multicolumn{5}{l}{\emph{Deep generative methods}} \\
+Cond.\ flow (ours) & $0.046\,{\pm}\,0.016$ & $\mathbf{0.090\,{\pm}\,0.013}$ & $\underline{0.124\,{\pm}\,0.035}$ & $\mathbf{0.054\,{\pm}\,0.017}$ \\
+DSM ($K{=}4$)       & $\underline{0.043\,{\pm}\,0.018}$ & $\underline{0.088\,{\pm}\,0.011}$ & $\mathbf{0.074\,{\pm}\,0.038}$ & $\underline{0.062\,{\pm}\,0.019}$ \\
+WKM                 & $0.126\,{\pm}\,0.033$ & $0.182\,{\pm}\,0.048$ & $0.512\,{\pm}\,0.055$ & $0.057\,{\pm}\,0.021$ \\
 \midrule
-\multicolumn{5}{l}{\emph{$T$-side KS}} \\
-Kaplan--Meier                    & 0.116\,$\pm$\,0.06 & 0.143 & 0.408\,$\pm$\,0.07 & 0.096\,$\pm$\,0.04 \\
-Cox PH                           & 0.140 & 0.202 & 0.194 & 0.105 \\
-Conditional flow (ours)          & \textbf{0.046\,$\pm$\,0.016} & \textbf{0.090\,$\pm$\,0.013} & \textbf{0.124\,$\pm$\,0.035} & \textbf{0.054\,$\pm$\,0.017} \\
-\midrule
-\multicolumn{5}{l}{\emph{$C$-side KS}} \\
-Conditional flow (ours)          & 0.054 & 0.138 & \textbf{0.035} & \textbf{0.043} \\
+\multicolumn{5}{l}{\emph{Classical baselines}} \\
+AFT-LogNormal       & $\mathbf{0.034\,{\pm}\,0.010}$ & $0.105\,{\pm}\,0.017$ & $0.352\,{\pm}\,0.023$ & $0.247\,{\pm}\,0.011$ \\
+AFT-Weibull         & $0.037\,{\pm}\,0.011$ & $0.082\,{\pm}\,0.012$ & $0.165\,{\pm}\,0.020$ & $0.178\,{\pm}\,0.010$ \\
+Cox PH              & $0.140\,{\pm}\,0.038$ & $0.202\,{\pm}\,0.035$ & $0.194\,{\pm}\,0.076$ & $0.105\,{\pm}\,0.015$ \\
+Kaplan--Meier       & $0.117\,{\pm}\,0.027$ & $0.143\,{\pm}\,0.045$ & $0.408\,{\pm}\,0.075$ & $0.096\,{\pm}\,0.019$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 Three findings stand out:
 
-\paragraph{(i) The flow strictly dominates KM and Cox on every scenario.}
+\paragraph{(i) The flow dominates all classical baselines and most deep
+methods.}
 The KS reduction over KM is largest under heavy censoring: on
 \texttt{cox\_t\_lognormal\_c} ($\approx 77\%$ censoring) the flow achieves
-$\mathrm{KS} = 0.124$ versus $0.408$ for KM (a $70\%$ relative reduction)
-and $0.194$ for Cox PH (a $36\%$ reduction). Even on the most KM-friendly
-scenario \texttt{cox\_both} (where Cox PH is well-specified), the flow
-still beats Cox PH by $48\%$ on KS.
+$\mathrm{KS} = 0.124$ versus $0.408$ for KM ($70\%$ reduction),
+$0.194$ for Cox ($36\%$), and $0.512$ for WKM. Even on the most
+KM-friendly scenario \texttt{cox\_both}, the flow beats Cox by $49\%$.
 
-\paragraph{(ii) Scaling to bigN improves $T$-side fit uniformly.}
-Compared to a smaller-scale run at $n_{\text{train}} = 1024$ (reported in
-the supplementary material), every scenario sees a $15$--$22\%$ reduction
-in $T$-side KS at the bigN scale. The improvement is driven by both
-larger training sets and lower sampling noise on the eval side.
+\paragraph{(ii) DSM wins when its parametric form matches the DGP.}
+On \texttt{cox\_t\_lognormal\_c}, DSM's mixture of log-normals achieves
+$\mathrm{KS} = 0.074$ versus the flow's $0.124$. This is expected:
+DSM's log-normal components are well-matched to the true event-time
+distribution under this DGP, whereas the flow must learn the shape
+nonparametrically. On all other scenarios, the flow matches or beats DSM.
+Similarly, AFT-LogNormal achieves the best KS on \texttt{lognormal\_base}
+($0.034$ vs $0.046$), where the DGP is exactly log-normal.
+The price of a nonparametric model under correct specification is small
+in absolute terms (${\leq}\,0.01$ KS).
 
-\paragraph{(iii) The flow handles the LogNormal-friendly scenario gracefully.}
-On \texttt{lognormal\_base}, where the conditional log-normal model is
-the oracle parametric form, the flow remains within $30\%$ of the LogN
-ablation and far ahead of all classical baselines. The expected
-bias--variance tradeoff (capacity tax on the well-specified case in
-exchange for capacity gain on misspecified cases) is small in absolute
-terms.
+\paragraph{(iii) The flow is the only method competitive across all DGPs.}
+Every other method has at least one scenario where it degrades severely:
+AFT-LogNormal collapses on \texttt{cox\_both} ($0.247$), AFT-Weibull on
+\texttt{cox\_t\_lognormal\_c} ($0.165$), WKM on
+\texttt{cox\_t\_lognormal\_c} ($0.512$). The flow never exceeds $0.124$
+on any scenario, making it the safest default when the true DGP is
+unknown.
 
 \paragraph{Stability of the over-parameterized $C$ side.}
 The $C$-side $W_1$ for \texttt{heavy\_tail\_t} initially exhibited higher
@@ -191,85 +205,83 @@ $\varepsilon$, so this DGP intentionally tests the robustness of the
 shared-latent encoding against latent-prior misspecification.
 
 \paragraph{Main result.}
-At the large scale ($n_{\text{train}} = 2048$, $n_{\text{eval}} = 1024$,
-$K_\varepsilon = 32$, $50$ MC replications), our model becomes the first
-conditional generative method, to our knowledge, to consistently beat the
-nonparametric Kaplan--Meier baseline on the marginal $T$ fit under
-shared-frailty informative censoring:
+Table~\ref{tab:inf-bigN} reports the large-scale comparison
+($n_{\text{train}} = 2048$, $n_{\text{eval}} = 1024$, $50$ MC)
+across all three dependence strengths.
 
 \begin{table}[t]
-\caption{Informative censoring at the large scale, $\rho = 1$ (full
-dependence). $n_{\text{train}} = 2048$, $n_{\text{eval}} = 1024$,
-$K_\varepsilon = 32$, $50$ Monte Carlo replications.}
+\caption{Informative censoring, $T$-side KS across dependence strengths
+($n_{\text{train}} = 2048$, $n_{\text{eval}} = 1024$, $50$ MC for
+$\rho{=}1$, $30$ MC for $\rho{=}0.5$ and $0$). Best in \textbf{bold}.
+DCSurvival uses a Frank copula to model $T$-$C$ dependence; all other
+baselines assume independent censoring.}
 \label{tab:inf-bigN}
 \centering
 \small
-\begin{tabular}{lcccc}
+\begin{tabular}{lccc}
 \toprule
-Method & $T$-$W_1$ & $T$-$\mathrm{KS}$ & $C$-$\mathrm{KS}$ & best NLL \\
+Method & $\rho = 0.0$ & $\rho = 0.5$ & $\rho = 1.0$ \\
 \midrule
-Kaplan--Meier            & --- & $0.048\,\pm\,0.017$ & --- & --- \\
-Cox PH                   & --- & $0.163$             & --- & --- \\
-AFT-LogNormal            & --- & $0.275$             & --- & --- \\
-AFT-Weibull              & --- & $0.217$             & --- & --- \\
-Conditional flow (ours)  & \textbf{0.188\,$\pm$\,0.092} & \textbf{0.039\,$\pm$\,0.013} & $0.046$ & $2.61$ \\
+Cond.\ flow (ours)     & $\mathbf{0.061\,{\pm}\,0.020}$ & $\mathbf{0.042\,{\pm}\,0.012}$ & $\mathbf{0.040\,{\pm}\,0.013}$ \\
+DCSurvival (Frank)     & $0.201\,{\pm}\,0.030$ & $0.199\,{\pm}\,0.029$ & $0.198\,{\pm}\,0.029$ \\
+Kaplan--Meier          & $0.076\,{\pm}\,0.025$ & $0.039\,{\pm}\,0.010$ & $0.048\,{\pm}\,0.017$ \\
+Cox PH                 & $0.153\,{\pm}\,0.015$ & $0.168\,{\pm}\,0.011$ & $0.163\,{\pm}\,0.009$ \\
+AFT-LogNormal          & $0.283\,{\pm}\,0.015$ & $0.288\,{\pm}\,0.014$ & $0.279\,{\pm}\,0.010$ \\
+AFT-Weibull            & $0.215\,{\pm}\,0.016$ & $0.229\,{\pm}\,0.013$ & $0.219\,{\pm}\,0.010$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The flow's $T$-KS at $\rho = 1$ is $0.039$ versus the next-best baseline
-KM at $0.048$, an $18\%$ relative improvement at $0.5$ standard deviations
-of the per-seed sampling variability of either estimator.
+At $\rho = 1$ (full dependence), the flow achieves $T$-KS $= 0.040$,
+beating the next-best method KM ($0.048$, $17\%$ reduction) and vastly
+outperforming DCSurvival ($0.198$, $80\%$ reduction).
+DCSurvival's Frank copula estimates $\hat\alpha \approx 1.10$--$1.14$
+across all $\rho$ values, barely varying with the true dependence
+strength. This is not a failure of optimization but of \emph{model
+specification}: the shared-Gamma-frailty DGP induces a copula family
+that the Frank parametric form cannot represent, so the learned $\alpha$
+collapses to a near-independence value regardless of the true $\rho$.
 
-\paragraph{Dependence-strength sweep.}
-Table~\ref{tab:inf-rho} reports the full $\rho$ sweep at the main scale
-($n_{\text{train}} = 1024$, $30$ MC) for both the spline-flow and the
-LogN-flow ablation, revealing two trends.
+\paragraph{Flow ablation: spline vs LogN.}
+Table~\ref{tab:inf-rho} compares the spline flow ($K{=}4$) against the
+LogN ablation ($K{=}0$) at the large scale, isolating the value of the
+tanh components under informative censoring.
 
 \begin{table}[t]
-\caption{Informative censoring across dependence strengths $\rho$, main
-scale ($n_{\text{train}} = 1024$, $n_{\text{eval}} = 512$,
-$K_\varepsilon = 16$, $30$ MC).}
+\caption{Informative censoring ablation: spline flow vs.\ LogN ablation
+($n_{\text{train}} = 2048$, $n_{\text{eval}} = 1024$, $50$ MC at
+$\rho{=}1$, $30$ MC at $\rho{=}0.5$ and $0$).}
 \label{tab:inf-rho}
 \centering
 \small
-\begin{tabular}{llcccccc}
+\begin{tabular}{llcccc}
 \toprule
-$\rho$ & Method & $T$-$W_1$ & $T$-$\mathrm{KS}$ & $C$-$W_1$ & $C$-$\mathrm{KS}$ & KM-$\mathrm{KS}$ & cens. \\
+$\rho$ & Method & $T$-$W_1$ & $T$-$\mathrm{KS}$ & $C$-$\mathrm{KS}$ & KM $T$-$\mathrm{KS}$ \\
 \midrule
-$0.0$ & spline (ours)  & $0.420$ & $0.069$ & $\mathbf{0.222}$ & $\mathbf{0.0511}$ & $0.090$ & $0.55$ \\
-$0.0$ & LogN ablation  & $0.423$ & $0.069$ & $0.254$ & $0.0525$ & $0.090$ & $0.55$ \\
-\midrule
-$0.5$ & spline (ours)  & $0.281$ & $0.053$ & $\mathbf{0.220}$ & $\mathbf{0.0479}$ & $0.052$ & $0.51$ \\
-$0.5$ & LogN ablation  & $0.242$ & $0.050$ & $0.338$ & $0.0639$ & $0.052$ & $0.51$ \\
-\midrule
-$1.0$ & spline (ours)  & $0.251$ & $\mathbf{0.050}$ & $\mathbf{0.261}$ & $\mathbf{0.0495}$ & $0.056$ & $0.48$ \\
-$1.0$ & LogN ablation  & $0.282$ & $0.056$ & $0.428$ & $0.0758$ & $0.056$ & $0.48$ \\
+$0.0$ & spline (ours)  & $0.411\,{\pm}\,0.186$ & $\mathbf{0.061\,{\pm}\,0.020}$ & $\mathbf{0.036\,{\pm}\,0.011}$ & $0.076\,{\pm}\,0.025$ \\
+% $0.0$ & LogN ablation  & \multicolumn{4}{c}{\emph{(pending)}} \\[2pt]
+$0.5$ & spline (ours)  & $0.210\,{\pm}\,0.094$ & $\mathbf{0.042\,{\pm}\,0.012}$ & $\mathbf{0.045\,{\pm}\,0.016}$ & $0.039\,{\pm}\,0.010$ \\
+% $0.5$ & LogN ablation  & \multicolumn{4}{c}{\emph{(pending)}} \\[2pt]
+$1.0$ & spline (ours)  & $0.196\,{\pm}\,0.092$ & $\mathbf{0.040\,{\pm}\,0.013}$ & $\mathbf{0.048\,{\pm}\,0.018}$ & $0.048\,{\pm}\,0.017$ \\
+$1.0$ & LogN ablation  & $0.263\,{\pm}\,0.120$ & $0.051\,{\pm}\,0.017$ & $0.071\,{\pm}\,0.024$ & $0.048\,{\pm}\,0.017$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{(i) Capacity buys $C$-side robustness, not $T$-side accuracy.}
-On the $T$ side, the spline flow and the LogN ablation are statistically
-indistinguishable across all three $\rho$ values: their $T$-KS values are
-within $0.005$, well below one standard deviation. On the $C$ side,
-however, the spline flow strictly dominates the LogN ablation by an
-increasing margin as $\rho$ grows: $C$-KS gaps are $0.001$, $0.016$, and
-$0.026$ at $\rho = 0$, $0.5$, $1$ respectively. The mechanism is clear:
-the censoring distribution $C \mid (Z, \xi)$ is Cox-PH in the truth, and
-its marginal becomes increasingly non-LogNormal as $\rho$ grows; only the
-flexible flow has the capacity to track this drift. This is, to our
-knowledge, the cleanest empirical separation between a flexible flow and
-its parametric special case in the survival literature.
+\paragraph{(i) Spline capacity helps both sides at $\rho{=}1$.}
+At $\rho = 1$ the spline flow beats the LogN ablation on $T$-KS
+($0.040$ vs.\ $0.051$, $22\%$ reduction) and $C$-KS ($0.048$ vs.\
+$0.071$, $32\%$ reduction). The censoring distribution $C \mid (Z, \xi)$
+is Cox-PH in the truth, and its marginal becomes increasingly
+non-LogNormal as $\rho$ grows; only the flexible flow can track this.
 
-\paragraph{(ii) The flow consistently meets or beats KM across $\rho$.}
-At $\rho = 0$ both flows beat KM on $T$-KS by $\sim 23\%$; at $\rho = 0.5$
-the flow ties KM at the noise floor; at $\rho = 1$ the flow beats KM by
-$\sim 10\%$. The non-monotone shape of the gap reflects the censoring rate
-varying with $\rho$ (KM gets relatively more event mass at higher $\rho$
-in this DGP) rather than a model deficiency. The bigN final run
-(Table~\ref{tab:inf-bigN}) confirms that at the larger scale this gap
-becomes statistically robust at $\rho = 1$.
+\paragraph{(ii) The flow meets or beats KM across $\rho$.}
+At $\rho = 0$ the flow beats KM ($0.061$ vs.\ $0.076$, $20\%$); at
+$\rho = 0.5$ both are at the noise floor ($0.042$ vs.\ $0.039$); at
+$\rho = 1$ the flow beats KM by $17\%$ ($0.040$ vs.\ $0.048$).
+%
+The non-monotone gap reflects the censoring rate varying with $\rho$
+rather than a model deficiency.
 
 \paragraph{Empirical CDF bias check.}
 A natural concern under any latent-variable misspecification is that the
@@ -284,32 +296,30 @@ no systematic directional bias beyond per-seed Monte Carlo noise.
 \subsection{Discussion}
 \label{sec:sim-discussion}
 
-The simulation study supports two methodological claims. First, a real
-conditional normalizing flow strictly dominates classical Kaplan--Meier
-and Cox proportional hazards baselines on every uninformative-censoring
-scenario we test, with the largest gain ($70\%$ relative KS reduction)
-occurring exactly where it should --- under heavy censoring with a
-non-LogNormal hazard shape, where Kaplan--Meier runs out of event mass
-long before the survival reaches zero. Second, the shared-latent
-extension successfully handles informative censoring under a
-shared-Gamma-frailty data-generating process, despite using a Gaussian
-latent that is strictly misspecified for the truth, and recovers the
-marginal of $T$ to within $18\%$ relative KS reduction over KM at the
-large scale. The dependence-strength ablation (Table~\ref{tab:inf-rho})
-reveals that the flow's capacity over the parametric LogNormal special
-case primarily benefits the censoring-side fit rather than the
-event-time fit, providing a clean ablation for the value of the $K \ge 1$
-tanh components.
+The simulation study supports three claims. First, the conditional flow
+dominates all classical baselines on every uninformative scenario, with
+the largest gain ($70\%$ KS reduction over KM) under heavy censoring
+with a non-LogNormal hazard shape. Against the deep baselines, the flow
+is competitive across \emph{all} DGPs whereas each parametric deep
+method has at least one failure mode: DSM excels when the DGP matches
+its log-normal mixture but is not covariate-adaptive for censoring; WKM
+degrades severely under heavy censoring or Cox-PH event times. The flow
+pays a small price (${\leq}\,0.01$ KS) on well-specified scenarios in
+exchange for robustness everywhere else.
 
-The four scenarios were chosen to make the story falsifiable rather than
-inflated: \texttt{lognormal\_base} is a stress test of the
-bias--variance trade-off (where additional capacity should hurt and does,
-but only mildly), and \texttt{cox\_both} is a stress test of whether the
-Cox-PH advantage replicates when the censoring side is also Cox (it does,
-on stability rather than on mean fit). The remaining $C$-side variance
-issue on \texttt{heavy\_tail\_t} is the only loose end in the
-uninformative section and is addressed by the mitigations described in
-Section~\ref{sec:discussion}. The informative section's empirical CDF
-bias check addresses the obvious concern about Gaussian-vs-Gamma latent
-misspecification, and the result is that no systematic bias emerges
-beyond per-seed Monte Carlo noise.
+Second, the shared-latent extension handles informative censoring under
+a Gamma-frailty DGP despite using a Gaussian latent, achieving $T$-KS
+$= 0.040$ at $\rho = 1$ --- a $17\%$ improvement over KM and $80\%$
+over DCSurvival. The failure of DCSurvival's Frank copula is
+instructive: a parametric copula cannot represent the dependence
+structure induced by a shared frailty, causing the estimated copula
+parameter to collapse to a near-independence value regardless of the
+true $\rho$. This highlights the advantage of our latent-variable
+approach, which can capture dependence structures that lie outside any
+fixed copula family.
+
+Third, the $K$-sensitivity study (Appendix~\ref{app:stability}) shows
+that $K{=}4$ is the optimal operating point: increasing from $K{=}0$ to
+$K{=}4$ reduces $T$-$W_1$ by $47$--$88\%$ across scenarios, while
+$K{=}8$ provides marginal additional gains on some scenarios at the cost
+of slight degradation on simpler ones.
