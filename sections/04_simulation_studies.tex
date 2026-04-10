@@ -205,16 +205,14 @@ $\varepsilon$, so this DGP intentionally tests the robustness of the
 shared-latent encoding against latent-prior misspecification.
 
 \paragraph{Main result.}
-Table~\ref{tab:inf-bigN} reports the large-scale comparison
-($n_{\text{train}} = 2048$, $n_{\text{eval}} = 1024$, $50$ MC)
-across all three dependence strengths.
+Table~\ref{tab:inf-bigN} compares all methods at the large scale
+($n_{\text{train}} = 2048$, $n_{\text{eval}} = 1024$).
 
 \begin{table}[t]
 \caption{Informative censoring, $T$-side KS across dependence strengths
-($n_{\text{train}} = 2048$, $n_{\text{eval}} = 1024$, $50$ MC for
-$\rho{=}1$, $30$ MC for $\rho{=}0.5$ and $0$). Best in \textbf{bold}.
-DCSurvival uses a Frank copula to model $T$-$C$ dependence; all other
-baselines assume independent censoring.}
+$\rho$ ($n_{\text{train}} = 2048$, $n_{\text{eval}} = 1024$).
+DCSurvival models $T$-$C$ dependence via a Frank copula; DSM and WKM
+assume independent censoring. Best in \textbf{bold}.}
 \label{tab:inf-bigN}
 \centering
 \small
@@ -222,25 +220,39 @@ baselines assume independent censoring.}
 \toprule
 Method & $\rho = 0.0$ & $\rho = 0.5$ & $\rho = 1.0$ \\
 \midrule
-Cond.\ flow (ours)     & $\mathbf{0.061\,{\pm}\,0.020}$ & $\mathbf{0.042\,{\pm}\,0.012}$ & $\mathbf{0.040\,{\pm}\,0.013}$ \\
-DCSurvival (Frank)     & $0.201\,{\pm}\,0.030$ & $0.199\,{\pm}\,0.029$ & $0.198\,{\pm}\,0.029$ \\
-Kaplan--Meier          & $0.076\,{\pm}\,0.025$ & $0.039\,{\pm}\,0.010$ & $0.048\,{\pm}\,0.017$ \\
+Cond.\ flow (ours)     & $\mathbf{0.061\,{\pm}\,0.020}$ & $0.042\,{\pm}\,0.012$ & $\mathbf{0.040\,{\pm}\,0.013}$ \\
+Kaplan--Meier          & $0.076\,{\pm}\,0.025$ & $\mathbf{0.039\,{\pm}\,0.010}$ & $0.048\,{\pm}\,0.017$ \\
+DSM ($K{=}4$)          & $0.092\,{\pm}\,0.025$ & $0.094\,{\pm}\,0.019$ & $0.109\,{\pm}\,0.021$ \\
 Cox PH                 & $0.153\,{\pm}\,0.015$ & $0.168\,{\pm}\,0.011$ & $0.163\,{\pm}\,0.009$ \\
-AFT-LogNormal          & $0.283\,{\pm}\,0.015$ & $0.288\,{\pm}\,0.014$ & $0.279\,{\pm}\,0.010$ \\
+DCSurvival (Frank)     & $0.201\,{\pm}\,0.030$ & $0.199\,{\pm}\,0.029$ & $0.198\,{\pm}\,0.029$ \\
 AFT-Weibull            & $0.215\,{\pm}\,0.016$ & $0.229\,{\pm}\,0.013$ & $0.219\,{\pm}\,0.010$ \\
+AFT-LogNormal          & $0.283\,{\pm}\,0.015$ & $0.288\,{\pm}\,0.014$ & $0.279\,{\pm}\,0.010$ \\
+WKM                    & $0.370\,{\pm}\,0.018$ & $0.385\,{\pm}\,0.017$ & $0.394\,{\pm}\,0.018$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-At $\rho = 1$ (full dependence), the flow achieves $T$-KS $= 0.040$,
-beating the next-best method KM ($0.048$, $17\%$ reduction) and vastly
-outperforming DCSurvival ($0.198$, $80\%$ reduction).
-DCSurvival's Frank copula estimates $\hat\alpha \approx 1.10$--$1.14$
-across all $\rho$ values, barely varying with the true dependence
-strength. This is not a failure of optimization but of \emph{model
-specification}: the shared-Gamma-frailty DGP induces a copula family
-that the Frank parametric form cannot represent, so the learned $\alpha$
-collapses to a near-independence value regardless of the true $\rho$.
+The methods split into three groups. The flow and KM sit at the top:
+the flow wins at $\rho = 0$ ($0.061$ vs.\ $0.076$) and $\rho = 1$
+($0.040$ vs.\ $0.048$), while KM edges ahead at $\rho = 0.5$ ($0.039$
+vs.\ $0.042$). The middle group --- DSM, Cox, DCSurvival, and the AFT
+models --- all sit above $0.09$ and show little sensitivity to $\rho$.
+WKM is the worst overall; its inverse-CDF sampling from bin-wise KM
+curves breaks down under informative censoring.
+
+Three patterns are worth noting. First, DSM gets worse as $\rho$
+increases ($0.092 \to 0.109$), which is what we would expect from a
+method that assumes independent censoring: the bias grows with the
+true dependence. Second, DCSurvival is essentially flat across $\rho$
+($\approx 0.20$). Its Frank copula estimates
+$\hat\alpha \approx 1.10$--$1.14$ regardless of the true dependence
+strength. The issue is not optimization but specification: the
+shared-Gamma-frailty DGP induces a copula structure that the Frank
+family cannot express, so the learned parameter stays near the
+independence value. Third, KM's good performance at $\rho = 0.5$
+reflects this DGP's censoring rate ($\approx 51\%$), which gives KM
+plenty of uncensored events to work with; at $\rho = 0$ the censoring
+rate rises to $55\%$ and KM falls behind.
 
 \paragraph{Flow ablation: spline vs LogN.}
 Table~\ref{tab:inf-rho} compares the spline flow ($K{=}4$) against the
@@ -296,30 +308,27 @@ no systematic directional bias beyond per-seed Monte Carlo noise.
 \subsection{Discussion}
 \label{sec:sim-discussion}
 
-The simulation study supports three claims. First, the conditional flow
-dominates all classical baselines on every uninformative scenario, with
-the largest gain ($70\%$ KS reduction over KM) under heavy censoring
-with a non-LogNormal hazard shape. Against the deep baselines, the flow
-is competitive across \emph{all} DGPs whereas each parametric deep
-method has at least one failure mode: DSM excels when the DGP matches
-its log-normal mixture but is not covariate-adaptive for censoring; WKM
-degrades severely under heavy censoring or Cox-PH event times. The flow
-pays a small price (${\leq}\,0.01$ KS) on well-specified scenarios in
-exchange for robustness everywhere else.
+The main finding is that the conditional flow is the only method that
+performs well across both censoring regimes, all DGPs, and all
+dependence strengths. Under uninformative censoring it beats every
+classical baseline, with the largest gain ($70\%$ KS reduction over KM)
+under heavy censoring. It pays a small price (${\leq}\,0.01$ KS) when a
+parametric model happens to be correctly specified --- AFT-LogNormal on
+\texttt{lognormal\_base}, DSM on \texttt{cox\_t\_lognormal\_c} --- but
+never fails badly. Every other method has at least one setting where it
+degrades to KS $> 0.15$.
 
-Second, the shared-latent extension handles informative censoring under
-a Gamma-frailty DGP despite using a Gaussian latent, achieving $T$-KS
-$= 0.040$ at $\rho = 1$ --- a $17\%$ improvement over KM and $80\%$
-over DCSurvival. The failure of DCSurvival's Frank copula is
-instructive: a parametric copula cannot represent the dependence
-structure induced by a shared frailty, causing the estimated copula
-parameter to collapse to a near-independence value regardless of the
-true $\rho$. This highlights the advantage of our latent-variable
-approach, which can capture dependence structures that lie outside any
-fixed copula family.
+Under informative censoring the picture is sharper. Methods that assume
+independence (DSM, WKM, the AFT models) get worse as $\rho$ grows, as
+expected. DCSurvival, the one competitor that explicitly models
+$T$-$C$ dependence, is unable to help: its Frank copula cannot express
+the frailty-induced dependence in this DGP, so the estimated copula
+parameter barely moves across $\rho$ and the $T$-side fit stays around
+$0.20$. The flow achieves $T$-KS $= 0.040$ at $\rho = 1$, a $17\%$
+improvement over KM and $80\%$ over DCSurvival, despite using a
+Gaussian latent that is misspecified for the true Gamma frailty.
 
-Third, the $K$-sensitivity study (Appendix~\ref{app:stability}) shows
-that $K{=}4$ is the optimal operating point: increasing from $K{=}0$ to
-$K{=}4$ reduces $T$-$W_1$ by $47$--$88\%$ across scenarios, while
-$K{=}8$ provides marginal additional gains on some scenarios at the cost
-of slight degradation on simpler ones.
+The $K$-sensitivity study (Appendix~\ref{app:stability}) shows $K{=}4$
+is the best operating point: going from $K{=}0$ to $K{=}4$ cuts
+$T$-$W_1$ by $47$--$88\%$ across scenarios, while $K{=}8$ gives
+diminishing returns with occasional degradation on simpler DGPs.
