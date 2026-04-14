@@ -81,11 +81,14 @@ setting; without it, the bisection-based inverse of the flow blocks gradient
 flow into the flow parameters.
 
 \paragraph{Position of this work.}
-We are, to our knowledge, the first to propose a real conditional normalizing
-flow for joint $(T, C)$ modeling under both uninformative and informative
-right censoring, with closed-form censored MLE in the forward direction and
-exact-gradient differentiable sampling in the inverse direction via implicit
-reparameterization. Compared to copula-based statistical methods
+We propose a conditional normalizing flow for joint $(T, C)$ modeling
+under both uninformative and informative right censoring, with closed-form
+censored MLE in the forward direction and exact-gradient differentiable
+sampling in the inverse direction via implicit reparameterization.
+While prior work has applied conditional flows to
+$T$-only survival modeling \citep{ausset2021conditional}, we extend
+the approach to the joint $(T, C)$ setting with a shared-latent
+informative censoring mechanism. Compared to copula-based statistical methods
 \citep{czado2023dependent,deresa2021semiparametric,zhang2024deepcopula}, our
 method does not specify a copula family and admits a strictly more flexible
 marginal class. Compared to deep generative survival baselines that target
