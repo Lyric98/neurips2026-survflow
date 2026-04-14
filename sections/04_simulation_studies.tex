@@ -422,9 +422,12 @@ our joint model maintains or improves its fit. On DGP2, the T-only flow
 degrades from $0.032$ at $\rho{=}0$ to $0.076$ at $\rho{=}1$
 ($+138\%$), while our model improves from $0.071$ to $0.045$
 ($-37\%$). At $\rho{=}1$, the joint model beats the T-only flow by
-$41\%$ on DGP2 and $26\%$ on DGP1. This is the central empirical
-finding: the value of joint $(T, C)$ modeling emerges precisely when
-censoring is informative.
+$41\%$ on DGP2 and $26\%$ on DGP1. Conversely, at $\rho{=}0$ the joint
+model pays a variance overhead from unnecessary latent marginalization
+(DGP2: $0.071$ vs.\ $0.032$). This is the cost of not knowing the
+censoring regime \emph{a priori}: the joint model is preferred when
+informative censoring cannot be ruled out, while the T-only flow
+suffices if independence is confidently assumed.
 
 \begin{table}[t]
 \caption{T-only flow (Ausset) vs.\ joint flow (ours) under informative
