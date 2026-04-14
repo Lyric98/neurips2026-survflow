@@ -55,11 +55,11 @@ We compare against four classical baselines and three recent deep methods:
           $T$-$C$ dependence.
 \end{itemize}
 For the uninformative experiments, we additionally report a
-\textbf{LogN-flow ablation} obtained by setting $K = 0$ in
-Equation~\eqref{eq:flow}, which reduces our model to a parametric
-conditional log-normal trained with the same censored MLE plus Soft--NA
-Wasserstein objective on the same MLP backbone. This isolates the effect
-of the $K \ge 1$ tanh components.
+\textbf{capacity study at $K = 0$} (the conditional LogNormal special
+case of Equation~\eqref{eq:flow}), trained with the same censored MLE
+plus Soft--NA Wasserstein objective on the same MLP backbone. This
+isolates the value of the $K \ge 1$ tanh components, since $K = 0$
+recovers the conditional LogNormal family exactly.
 
 \paragraph{Metrics.}
 For each replication we report the marginal $1$-Wasserstein distance
@@ -254,13 +254,14 @@ reflects this DGP's censoring rate ($\approx 51\%$), which gives KM
 plenty of uncensored events to work with; at $\rho = 0$ the censoring
 rate rises to $55\%$ and KM falls behind.
 
-\paragraph{Flow ablation: spline vs LogN.}
+\paragraph{Flow capacity study: $K{=}4$ vs $K{=}0$.}
 Table~\ref{tab:inf-rho} compares the spline flow ($K{=}4$) against the
-LogN ablation ($K{=}0$) at the large scale, isolating the value of the
-tanh components under informative censoring.
+$K{=}0$ special case (conditional LogNormal) at the large scale,
+isolating the contribution of the tanh components under informative
+censoring.
 
 \begin{table}[t]
-\caption{Informative censoring ablation: spline flow vs.\ LogN ablation
+\caption{Informative censoring capacity study: spline flow ($K{=}4$) vs.\ LogN ($K{=}0$)
 ($n_{\text{train}} = 2048$, $n_{\text{eval}} = 1024$, $50$ MC at
 $\rho{=}1$, $30$ MC at $\rho{=}0.5$ and $0$).}
 \label{tab:inf-rho}
@@ -281,7 +282,7 @@ $1.0$ & LogN ablation  & $0.263\,{\pm}\,0.120$ & $0.051\,{\pm}\,0.017$ & $0.071\
 \end{table}
 
 \paragraph{(i) Spline capacity helps both sides at $\rho{=}1$.}
-At $\rho = 1$ the spline flow beats the LogN ablation on $T$-KS
+At $\rho = 1$ the spline flow beats the $K{=}0$ baseline on $T$-KS
 ($0.040$ vs.\ $0.051$, $22\%$ reduction) and $C$-KS ($0.048$ vs.\
 $0.071$, $32\%$ reduction). The censoring distribution $C \mid (Z, \xi)$
 is Cox-PH in the truth, and its marginal becomes increasingly
@@ -332,3 +333,15 @@ The $K$-sensitivity study (Appendix~\ref{app:stability}) shows $K{=}4$
 is the best operating point: going from $K{=}0$ to $K{=}4$ cuts
 $T$-$W_1$ by $47$--$88\%$ across scenarios, while $K{=}8$ gives
 diminishing returns with occasional degradation on simpler DGPs.
+
+\paragraph{Recovery of Cox PH.}
+Under the two Cox-PH DGPs (\texttt{cox\_both} and
+\texttt{cox\_t\_lognormal\_c}), the flow achieves lower KS than the
+correctly-specified Cox PH estimator ($0.054$ vs.\ $0.105$ and $0.124$
+vs.\ $0.194$), demonstrating that the nonparametric model does not pay a
+significant finite-sample efficiency penalty relative to semiparametric
+alternatives, even when the latter are correctly specified. This is a
+consequence of the full conditional likelihood --- which uses the joint
+$(T, C)$ information rather than Cox's partial likelihood --- together
+with the Soft--NA Wasserstein regularizer that constraints the
+population-level survival curve.

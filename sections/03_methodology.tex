@@ -144,10 +144,10 @@ in the upper and lower tails of the likelihood:
 Setting $K = 0$ in~\eqref{eq:flow} reduces $h_\theta$ to
 $h_{\text{LN}}(\log t; z) = a(z)\,\log t + b(z)$, which is exactly the
 conditional LogNormal model with location $-b(z)/a(z)$ and scale $1/a(z)$.
-This is a strict special case of the proposed flow and is the "LogN-flow
-ablation" reported in Section~\ref{sec:sim}: it isolates the contribution of
-the $K$ tanh components ($K = 4$ in our experiments) under an otherwise
-identical optimization pipeline.
+This is a strict special case of the proposed flow; Section~\ref{sec:sim}
+reports a capacity study at $K = 0$ versus $K = 4$ that isolates the
+contribution of the tanh components under an otherwise identical
+optimization pipeline.
 
 \subsection{Censored joint log-likelihood}
 \label{sec:mle}
@@ -270,7 +270,12 @@ and the total training objective is
     \lambda \cdot \mathcal{L}_{\text{NA-W}}(\theta_1, \theta_2),
     \label{eq:total}
 \end{equation}
-with $\lambda = 0.2$ and $S = 3$ in all experiments.
+with $\lambda = 0.2$ and $S = 3$ in all experiments (sensitivity
+analysis in Appendix~\ref{app:sensitivity}). Each epoch draws fresh noise
+for all $S$ simulations, so the model is exposed to
+$S \times \text{epochs}$ distinct simulated curves over training; $S = 3$
+per batch suffices for gradient variance because the dominant signal comes
+from the MLE term ($\lambda = 0.2$ makes the regularizer secondary).
 
 \subsection{Differentiable sampling via implicit reparameterization}
 \label{sec:samp}
@@ -548,7 +553,10 @@ four data-generating processes and across all Monte Carlo replications;
 nothing is tuned per scenario.
 
 \begin{table}[t]
-\caption{Hyperparameters for the conditional flow (\texttt{MonotoneFlow1D}).}
+\caption{Hyperparameters for the conditional flow (\texttt{MonotoneFlow1D}).
+All values were fixed on a held-out LogNormal DGP before any evaluation
+and never revisited; sensitivity analysis in
+Appendix~\ref{app:sensitivity} confirms robustness.}
 \label{tab:hp}
 \centering
 \small

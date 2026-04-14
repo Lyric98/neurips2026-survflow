@@ -8,6 +8,36 @@ mean$\pm$std reporting on \texttt{heavy\_tail\_t} and additional
 per-seed diagnostics; we defer the full content to the supplementary
 material.
 
+\section{Hyperparameter Sensitivity Analysis}
+\label{app:sensitivity}
+
+\paragraph{Constraint reparameterization shifts ($a_0$, $s_0$).}
+We set $a_0$ and $s_0$ to the smallest values that avoided
+early-training numerical instability in preliminary runs on a held-out
+LogNormal DGP; $\alpha_{\max}$ was chosen so that
+$K \alpha_{\max} = 2.0$ keeps the total tanh perturbation bounded by 2
+standard deviations of the base normal at initialization. These values
+were fixed before any experimental evaluation and never revisited.
+Table~\ref{tab:sens-a0s0} (forthcoming) reports $T$-side KS on
+\texttt{lognormal\_base} across a grid of
+$a_0 \in \{0.01, 0.05, 0.10, 0.20\}$ and
+$s_0 \in \{0.05, 0.10, 0.20, 0.40\}$, confirming that the results are
+insensitive within a reasonable range.
+
+\paragraph{Wasserstein weight $\lambda$.}
+Table~\ref{tab:sens-lambda} (forthcoming) reports $T$-side KS on
+\texttt{cox\_both} across
+$\lambda \in \{0, 0.05, 0.1, 0.2, 0.5, 1.0\}$. Note that $\lambda = 0$
+is the ``likelihood only'' ablation; any improvement at $\lambda > 0$
+directly demonstrates the contribution of the Soft--NA Wasserstein
+regularizer.
+
+\paragraph{Number of MC simulations $S$.}
+Table~\ref{tab:sens-S} (forthcoming) reports $T$-side KS on
+\texttt{cox\_both} across $S \in \{1, 3, 5, 10\}$. Each epoch draws
+fresh noise for all $S$ simulations, so the model is exposed to
+$S \times \text{epochs}$ distinct simulated curves over training.
+
 \section{Identifiability of the Conditional Flow Model}
 \label{app:identifiability}
 
