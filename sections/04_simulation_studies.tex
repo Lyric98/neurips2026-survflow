@@ -1,13 +1,15 @@
 \section{Simulation Studies}
 \label{sec:sim}
 
-We organize the simulation study in two parts mirroring the methodology:
+We organize the simulation study in three parts:
 Section~\ref{sec:sim-uninf} validates the conditional flow under
-uninformative censoring on four standard data-generating processes (DGPs),
-and Section~\ref{sec:sim-inf} validates the shared-latent extension under
-informative censoring on a Cox-with-Gamma-frailty DGP across three
-dependence strengths. Across both parts, we report mean $\pm$ standard
-deviation across $30$--$50$ Monte Carlo replications.
+uninformative censoring on five data-generating processes (DGPs),
+Section~\ref{sec:sim-inf} validates the shared-latent extension under
+informative censoring on two distinct frailty DGPs across three
+dependence strengths, and Section~\ref{sec:sim-discussion} discusses
+the role of the Wasserstein regularizer and standard survival metrics.
+Across all parts, we report mean $\pm$ standard deviation across
+$30$--$50$ Monte Carlo replications.
 
 \subsection{Setup common to both regimes}
 \label{sec:sim-setup}
@@ -53,6 +55,12 @@ We compare against four classical baselines and three recent deep methods:
           dependence parameter $\alpha$, trained by copula-augmented
           censored MLE. The only competing method that explicitly models
           $T$-$C$ dependence.
+    \item \textbf{T-only flow} \citep{ausset2021conditional}. A
+          conditional normalizing flow trained with standard censored MLE
+          for $T$ only (no $C$ model, no Wasserstein regularizer). Uses
+          the same $K{=}4$ MonotoneFlow1D architecture as our method,
+          isolating the contribution of joint $(T, C)$ modeling and the
+          regularizer.
 \end{itemize}
 For the uninformative experiments, we additionally report a
 \textbf{capacity study at $K = 0$} (the conditional LogNormal special
@@ -80,12 +88,12 @@ $T$-side CDF only and are evaluated against the same true marginal of $T$.
 \label{sec:sim-uninf}
 
 \paragraph{Data-generating processes.}
-We use four DGPs satisfying $T \perp C \mid Z$ and chosen to span the
-log-location-scale family that the LogN ablation can exactly represent
-($\texttt{lognormal\_base}$), heavy-tailed deviations
-($\texttt{heavy\_tail\_t}$), and Cox proportional hazards forms that lie
-strictly outside the log-normal family ($\texttt{cox\_t\_lognormal\_c}$
-and $\texttt{cox\_both}$):
+We use five DGPs satisfying $T \perp C \mid Z$, chosen to span the
+log-location-scale family ($\texttt{lognormal\_base}$), heavy-tailed
+deviations ($\texttt{heavy\_tail\_t}$), Cox proportional hazards forms
+($\texttt{cox\_t\_lognormal\_c}$ and $\texttt{cox\_both}$), and a
+distribution strictly outside any log-location-scale family
+($\texttt{weibull\_base}$):
 \begin{enumerate}
     \item \textbf{lognormal\_base.} $T \mid Z$ and $C \mid Z$ are
           conditional LogNormal with nonlinear means and mild
@@ -100,6 +108,11 @@ and $\texttt{cox\_both}$):
           ($\beta_T = 0.75$, $\beta_C = -0.50$,
           $\lambda_{0,T} = 0.20$, $\lambda_{0,C} = 0.24$). Censoring
           $\approx 53\%$.
+    \item \textbf{weibull\_base.} $T \mid Z$ is conditional Weibull with
+          covariate-dependent shape and scale; $C \mid Z$ is LogNormal.
+          This DGP is \emph{not} reducible to any log-location-scale
+          family (shape $\neq 1$), testing the flow's flexibility beyond
+          its LogNormal special case. Censoring $\approx 50\%$.
 \end{enumerate}
 
 \paragraph{Main results.}
@@ -115,21 +128,22 @@ Mean $\pm$ std. Best in \textbf{bold}, second-best \underline{underlined}.}
 \label{tab:uninf-main}
 \centering
 \small
-\begin{tabular}{lcccc}
+\begin{tabular}{lccccc}
 \toprule
-Method & \texttt{logn\_base} & \texttt{heavy\_tail\_t} & \texttt{cox\_t\_logn\_c} & \texttt{cox\_both}\\
-& (${\approx}\,51\%$ cens.) & (${\approx}\,51\%$ cens.) & (${\approx}\,77\%$ cens.) & (${\approx}\,53\%$ cens.) \\
+Method & \texttt{logn\_base} & \texttt{heavy\_tail\_t} & \texttt{cox\_t\_logn\_c} & \texttt{cox\_both} & \texttt{weibull}\\
+& (${\approx}\,51\%$) & (${\approx}\,51\%$) & (${\approx}\,77\%$) & (${\approx}\,53\%$) & (${\approx}\,50\%$) \\
 \midrule
-\multicolumn{5}{l}{\emph{Deep generative methods}} \\
-Cond.\ flow (ours) & $0.046\,{\pm}\,0.016$ & $\mathbf{0.090\,{\pm}\,0.013}$ & $\underline{0.124\,{\pm}\,0.035}$ & $\mathbf{0.054\,{\pm}\,0.017}$ \\
-DSM ($K{=}4$)       & $\underline{0.043\,{\pm}\,0.018}$ & $\underline{0.088\,{\pm}\,0.011}$ & $\mathbf{0.074\,{\pm}\,0.038}$ & $\underline{0.062\,{\pm}\,0.019}$ \\
-WKM                 & $0.126\,{\pm}\,0.033$ & $0.182\,{\pm}\,0.048$ & $0.512\,{\pm}\,0.055$ & $0.057\,{\pm}\,0.021$ \\
+\multicolumn{6}{l}{\emph{Deep generative / flow methods}} \\
+Cond.\ flow (ours) & $0.046\,{\pm}\,0.016$ & $\mathbf{0.090\,{\pm}\,0.013}$ & $0.124\,{\pm}\,0.035$ & $\mathbf{0.054\,{\pm}\,0.017}$ & $\mathbf{0.061\,{\pm}\,0.019}$ \\
+T-only flow        & $\mathbf{0.039\,{\pm}\,0.009}$ & $0.090\,{\pm}\,0.015$ & $\mathbf{0.092\,{\pm}\,0.036}$ & $0.055\,{\pm}\,0.020$ & --- \\
+DSM ($K{=}4$)       & $0.043\,{\pm}\,0.018$ & $\underline{0.088\,{\pm}\,0.011}$ & $\underline{0.074\,{\pm}\,0.038}$ & $\underline{0.062\,{\pm}\,0.019}$ & --- \\
+WKM                 & $0.126\,{\pm}\,0.033$ & $0.182\,{\pm}\,0.048$ & $0.512\,{\pm}\,0.055$ & $0.057\,{\pm}\,0.021$ & --- \\
 \midrule
-\multicolumn{5}{l}{\emph{Classical baselines}} \\
-AFT-LogNormal       & $\mathbf{0.034\,{\pm}\,0.010}$ & $0.105\,{\pm}\,0.017$ & $0.352\,{\pm}\,0.023$ & $0.247\,{\pm}\,0.011$ \\
-AFT-Weibull         & $0.037\,{\pm}\,0.011$ & $0.082\,{\pm}\,0.012$ & $0.165\,{\pm}\,0.020$ & $0.178\,{\pm}\,0.010$ \\
-Cox PH              & $0.140\,{\pm}\,0.038$ & $0.202\,{\pm}\,0.035$ & $0.194\,{\pm}\,0.076$ & $0.105\,{\pm}\,0.015$ \\
-Kaplan--Meier       & $0.117\,{\pm}\,0.027$ & $0.143\,{\pm}\,0.045$ & $0.408\,{\pm}\,0.075$ & $0.096\,{\pm}\,0.019$ \\
+\multicolumn{6}{l}{\emph{Classical baselines}} \\
+AFT-LogNormal       & $\underline{0.034\,{\pm}\,0.010}$ & $0.105\,{\pm}\,0.017$ & $0.352\,{\pm}\,0.023$ & $0.247\,{\pm}\,0.011$ & --- \\
+AFT-Weibull         & $0.037\,{\pm}\,0.011$ & $0.082\,{\pm}\,0.012$ & $0.165\,{\pm}\,0.020$ & $0.178\,{\pm}\,0.010$ & --- \\
+Cox PH              & $0.140\,{\pm}\,0.038$ & $0.202\,{\pm}\,0.035$ & $0.194\,{\pm}\,0.076$ & $0.105\,{\pm}\,0.015$ & --- \\
+Kaplan--Meier       & $0.117\,{\pm}\,0.027$ & $0.143\,{\pm}\,0.045$ & $0.408\,{\pm}\,0.075$ & $0.096\,{\pm}\,0.019$ & --- \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -184,9 +198,12 @@ tendency is unaffected and only the outlier seeds are eliminated.
 \subsection{Informative censoring}
 \label{sec:sim-inf}
 
-\paragraph{Data-generating process.}
-We use a Cox-PH-with-shared-Gamma-frailty DGP that admits a single knob
-$\rho \in [0, 1]$ for the strength of dependence between $T$ and $C$:
+\paragraph{Data-generating processes.}
+We use two informative-censoring DGPs with different frailty
+distributions and marginal families, both parameterized by a single knob
+$\rho \in [0, 1]$ controlling the strength of $T$-$C$ dependence.
+
+\textbf{DGP1: shared Gamma frailty with Cox margins.}
 \[
     \xi \sim \mathrm{Gamma}(k, k) / k,
     \quad
@@ -203,6 +220,20 @@ at $\rho = 0,\, 0.5,\, 1$ respectively. Crucially, the true latent here
 is a \emph{Gamma} frailty, while our model uses a \emph{Gaussian} latent
 $\varepsilon$, so this DGP intentionally tests the robustness of the
 shared-latent encoding against latent-prior misspecification.
+
+\textbf{DGP2: shared LogNormal frailty with Weibull margins.}
+\[
+    \xi \sim \mathrm{LogNormal}(0, 0.5),
+    \quad
+    T \;\sim\; \mathrm{Weibull}(\text{shape}{=}1.5,\; \text{scale} = e^{0.4Z} \cdot \xi),
+    \quad
+    C \;\sim\; \mathrm{Weibull}(\text{shape}{=}1.2,\; \text{scale} = e^{-0.3Z} \cdot \xi^{\rho}).
+\]
+This DGP differs from DGP1 in three ways: (i)~the frailty is LogNormal
+rather than Gamma, (ii)~the marginals are Weibull rather than
+Cox-exponential, and (iii)~the dependence acts through the scale rather
+than the hazard. Together, DGP1 and DGP2 test whether the shared-latent
+mechanism is robust across frailty distributions and marginal families.
 
 \paragraph{Main result.}
 Table~\ref{tab:inf-bigN} compares all methods at the large scale
@@ -296,6 +327,30 @@ $\rho = 1$ the flow beats KM by $17\%$ ($0.040$ vs.\ $0.048$).
 The non-monotone gap reflects the censoring rate varying with $\rho$
 rather than a model deficiency.
 
+\paragraph{DGP2 results.}
+Table~\ref{tab:dgp2} reports the flow's $T$-side KS on DGP2 across
+$\rho$. The pattern mirrors DGP1: $T$-KS improves as dependence
+increases ($0.071 \to 0.045$), confirming that the shared-latent
+mechanism can exploit frailty structure regardless of whether the true
+frailty is Gamma or LogNormal and whether the marginals are Cox or
+Weibull.
+
+\begin{table}[t]
+\caption{Informative censoring DGP2 (LogNormal-Weibull frailty), $T$-
+and $C$-side KS ($n_{\text{train}} = 2048$, $30$ MC).}
+\label{tab:dgp2}
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Metric & $\rho = 0.0$ & $\rho = 0.5$ & $\rho = 1.0$ \\
+\midrule
+$T$-KS & $0.071\,{\pm}\,0.020$ & $\mathbf{0.044\,{\pm}\,0.015}$ & $0.045\,{\pm}\,0.013$ \\
+$C$-KS & $\mathbf{0.051\,{\pm}\,0.013}$ & $0.071\,{\pm}\,0.016$ & $0.082\,{\pm}\,0.015$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \paragraph{Empirical CDF bias check.}
 A natural concern under any latent-variable misspecification is that the
 model might systematically overestimate or underestimate the survival
@@ -340,8 +395,38 @@ Under the two Cox-PH DGPs (\texttt{cox\_both} and
 correctly-specified Cox PH estimator ($0.054$ vs.\ $0.105$ and $0.124$
 vs.\ $0.194$), demonstrating that the nonparametric model does not pay a
 significant finite-sample efficiency penalty relative to semiparametric
-alternatives, even when the latter are correctly specified. This is a
-consequence of the full conditional likelihood --- which uses the joint
-$(T, C)$ information rather than Cox's partial likelihood --- together
-with the Soft--NA Wasserstein regularizer that constraints the
-population-level survival curve.
+alternatives, even when the latter are correctly specified.
+
+\paragraph{Role of the Wasserstein regularizer.}
+A $\lambda$-sweep on \texttt{cox\_both}
+(Appendix~\ref{app:sensitivity}) shows a U-shaped curve: $\lambda = 0$
+(likelihood only) gives $T$-KS $= 0.058$, which improves to $0.052$ at
+$\lambda = 0.1$ ($10\%$ reduction) and degrades to $0.066$ at
+$\lambda = 1.0$ (over-regularization). On \texttt{heavy\_tail\_t},
+performance is flat across $\lambda$ ($0.089$--$0.090$). The
+regularizer's value is thus \emph{scenario-dependent}: it provides a
+measurable benefit when the DGP's population survival curve carries
+distributional information beyond individual likelihoods (as in the Cox
+scenarios), but neither helps nor hurts when the likelihood alone is
+already informative (as in the heavy-tailed scenario).
+
+\paragraph{T-only flow baseline.}
+Under uninformative censoring, the T-only flow
+\citep{ausset2021conditional} matches our joint model on 2/5 DGPs and
+outperforms it on 2/5 DGPs (Table~\ref{tab:uninf-main}). This is
+expected: when $T \perp C \mid Z$, modeling $C$ adds no information
+about $T$. The value of joint $(T, C)$ modeling is realized under
+informative censoring, where the T-only flow's MLE becomes biased
+because it assumes independence that does not hold. We report this
+comparison under informative censoring once the Ausset-under-DGP1/DGP2
+experiments complete (in preparation).
+
+\paragraph{Standard survival metrics.}
+The integrated Brier score (IBS) and Harrell's C-index confirm the same
+overall ranking as KS (Appendix~\ref{app:sensitivity}): on all four
+uninformative DGPs, the flow's IBS and C-index are competitive with DSM
+and Cox PH (C-index differences $< 0.002$). The C-index is nearly
+identical across all parametric methods, reflecting the fact that
+risk-ordering ability saturates under a one-dimensional covariate.
+Distributional metrics (KS, $W_1$) are more discriminating for
+evaluating full-distribution recovery.

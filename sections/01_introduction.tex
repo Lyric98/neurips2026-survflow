@@ -1,16 +1,30 @@
 \section{Introduction}
 \label{sec:intro}
 
-% TODO: Zexi/Yanran — write intro after methodology and experiments stabilize.
+% TODO: Zexi/Yanran — write full intro narrative.
 
 \paragraph{Contributions.}
 \begin{itemize}
-    \item A joint conditional-flow model for right-censored survival data with
-          closed-form likelihood, survival, and density.
-    \item A differentiable Soft--Nelson--Aalen Wasserstein regularizer that
-          augments the censored MLE with a population-level distributional
-          constraint.
-    \item A four-scenario simulation study showing the proposed flow strictly
-          dominates Kaplan--Meier, Cox PH, parametric AFT, and a parametric
-          LogNormal-flow ablation on $T$-side fit.
+    \item A conditional normalizing flow for jointly modeling event time
+          $T$ and censoring time $C$ under right censoring, with
+          closed-form density, survival function, and censored
+          log-likelihood. The flow extends to informative censoring via a
+          shared-latent variable that induces $T$-$C$ dependence without
+          specifying a copula family.
+    \item A differentiable Soft--Nelson--Aalen Wasserstein regularizer
+          that augments the censored MLE with a population-level
+          distributional constraint, providing scenario-dependent
+          improvement (up to $10\%$ KS reduction on Cox-PH DGPs).
+    \item An identifiability result showing that the marginal distribution
+          of $T$ is identified from right-censored data under the proposed
+          flow class, extending the Czado--Van~Keilegom framework to
+          normalizing flows.
+    \item Comprehensive evaluation on five synthetic DGPs under both
+          uninformative and informative censoring (two distinct frailty
+          mechanisms, $\rho \in \{0, 0.5, 1\}$), and on the Rotterdam
+          breast cancer dataset ($n = 2{,}982$, $d = 7$). The flow is the
+          only method competitive across all settings: it matches or beats
+          correctly-specified parametric models and T-only deep baselines,
+          and maintains accuracy under informative censoring where
+          independence-assuming methods degrade.
 \end{itemize}

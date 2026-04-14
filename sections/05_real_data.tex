@@ -1,5 +1,57 @@
-\section{Real-Data Application}
+\section{Real-Data Application: Rotterdam Breast Cancer}
 \label{sec:real}
 
-% TODO: pick one of the standard survival benchmarks (METABRIC, SUPPORT, GBSG2)
-% once methodology and simulation tables are locked.
+We evaluate the flow on the Rotterdam breast cancer dataset
+\citep{foekens2000rotterdam} ($n = 2{,}982$ patients, $d = 7$ covariates:
+age, menopausal status, tumor size, histological grade, number of positive
+lymph nodes, progesterone receptor level, and estrogen receptor level).
+The endpoint is time to disease recurrence ($T$), with death without
+recurrence as the censoring event ($C$). This is a natural setting for
+joint $(T, C)$ modeling: death competes with recurrence, so censoring is
+plausibly informative.
+
+\paragraph{Protocol.}
+We use $5$-fold cross-validation repeated $5$ times ($25$ train/test
+splits). All covariates are standardized to zero mean and unit variance.
+Times are measured in years, clipped to $[0.01, 15]$. The flow uses
+$K = 4$ tanh components, hidden dimension $64$, and the same
+hyperparameters as the simulation study. We compare against DSM ($K{=}4$
+mixture of LogNormals), multivariate Cox PH (partial likelihood with
+Breslow baseline), and Kaplan--Meier. Metrics are the IPCW-weighted
+integrated Brier score \citep{graf1999assessment} and Harrell's
+concordance index.
+
+\paragraph{Results.}
+Table~\ref{tab:rotterdam} reports mean $\pm$ standard deviation across
+the $25$ splits.
+
+\begin{table}[t]
+\caption{Rotterdam breast cancer ($n = 2{,}982$, $d = 7$): $5 \times 5$
+cross-validated IBS and C-index. Best in \textbf{bold}.}
+\label{tab:rotterdam}
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+Method & IBS ($\downarrow$) & C-index ($\uparrow$) \\
+\midrule
+Cond.\ flow (ours) & $\mathbf{0.180\,{\pm}\,0.004}$ & $\mathbf{0.679\,{\pm}\,0.016}$ \\
+DSM ($K{=}4$)       & $\mathbf{0.180\,{\pm}\,0.005}$ & $0.679\,{\pm}\,0.018$ \\
+Cox PH              & $0.184\,{\pm}\,0.004$ & $0.674\,{\pm}\,0.015$ \\
+Kaplan--Meier       & $0.211\,{\pm}\,0.003$ & $0.500\,{\pm}\,0.000$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The flow and DSM are statistically tied (IBS $= 0.180$, C-index
+$\approx 0.679$), both outperforming Cox PH on calibration (IBS $0.180$
+vs.\ $0.184$) and discrimination (C-index $0.679$ vs.\ $0.674$). All
+covariate-aware methods strongly dominate KM ($0.211$ / $0.500$).
+
+Two observations are worth noting. First, the flow achieves competitive
+performance on real data with $d = 7$ covariates using the same
+architecture and hyperparameters as the $d = 1$ simulations, suggesting
+the method scales without scenario-specific tuning. Second, the flow
+jointly models event and censoring times, which may provide more
+informative predictions in settings where the censoring mechanism itself
+is of clinical interest (e.g., death competing with recurrence).

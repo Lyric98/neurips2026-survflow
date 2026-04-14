@@ -1,6 +1,40 @@
 \section{Discussion}
 \label{sec:discussion}
 
-% TODO: limitations (CPU only so far, $n=512$, no informative censoring yet),
-% extensions to shared-frailty informative censoring (deepseek_markdown §4),
-% future work on RQS-based flows.
+We have presented a conditional normalizing flow for jointly modeling
+event and censoring times under right censoring, augmented with a
+Soft--Nelson--Aalen Wasserstein regularizer and extended to informative
+censoring via a shared-latent variable. The approach achieves three
+goals simultaneously: (i)~closed-form density and survival function for
+exact censored MLE, (ii)~differentiable sampling for end-to-end
+distributional regularization, and (iii)~identifiability of the marginal
+event-time distribution under dependent censoring.
+
+\paragraph{Where the method helps most.}
+The primary value of joint $(T, C)$ modeling emerges under informative
+censoring, where methods assuming independence (DSM, WKM, AFT) degrade
+as dependence increases. Under uninformative censoring, a simpler T-only
+flow achieves comparable $T$-side fit, consistent with the theoretical
+expectation that modeling $C$ adds no information about $T$ when they
+are conditionally independent. The Wasserstein regularizer provides a
+scenario-dependent benefit (up to $10\%$ KS improvement on Cox-PH DGPs)
+but is not universally necessary.
+
+\paragraph{Limitations.}
+Several limitations should be noted. First, the simulation study uses
+one-dimensional covariates; while Rotterdam ($d = 7$) demonstrates
+feasibility at moderate dimensionality, scaling to high-dimensional
+covariates ($d \gg 10$) remains untested. Second, the identifiability
+proof relies on tail-asymptotic arguments and the gauge-fixing
+assumption (A3); finite-sample identifiability guarantees would
+strengthen the theoretical contribution. Third, training is CPU-based
+and full-batch; GPU acceleration and mini-batch training would be
+needed for large-scale applications. Fourth, we do not address competing
+risks or recurrent events, which require extensions beyond the single
+$(T, C)$ framework.
+
+\paragraph{Future work.}
+Natural extensions include replacing the tanh basis with rational-quadratic
+spline (RQS) coupling layers for improved tail flexibility, extending to
+the competing-risks setting with multiple event types, and developing
+conformal prediction intervals from the flow's generative samples.

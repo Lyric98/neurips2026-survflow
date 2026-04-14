@@ -18,25 +18,75 @@ LogNormal DGP; $\alpha_{\max}$ was chosen so that
 $K \alpha_{\max} = 2.0$ keeps the total tanh perturbation bounded by 2
 standard deviations of the base normal at initialization. These values
 were fixed before any experimental evaluation and never revisited.
-Table~\ref{tab:sens-a0s0} (forthcoming) reports $T$-side KS on
-\texttt{lognormal\_base} across a grid of
-$a_0 \in \{0.01, 0.05, 0.10, 0.20\}$ and
-$s_0 \in \{0.05, 0.10, 0.20, 0.40\}$, confirming that the results are
-insensitive within a reasonable range.
+Table~\ref{tab:sens-a0s0} reports $T$-side KS on
+\texttt{lognormal\_base} across a $4 \times 4$ grid; the full range is
+$0.043$--$0.045$ (spread $< 0.003$), confirming complete insensitivity.
+
+\begin{table}[h]
+\caption{$T$-KS on \texttt{lognormal\_base} across $(a_0, s_0)$ grid,
+$\alpha_{\max} = 0.5$, 10 MC runs each.}
+\label{tab:sens-a0s0}
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+$a_0$ \textbackslash\ $s_0$ & $0.05$ & $0.10$ & $0.20$ & $0.40$ \\
+\midrule
+$0.01$ & $0.045$ & $0.044$ & $0.044$ & $0.043$ \\
+$0.05$ & $0.045$ & $0.045$ & $0.044$ & $0.043$ \\
+$0.10$ & $0.045$ & $0.044$ & $0.045$ & $0.043$ \\
+$0.20$ & $0.045$ & $0.044$ & $0.044$ & $0.043$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For $\alpha_{\max}$, performance is stable from $0.10$ to $0.50$
+($T$-KS $0.041$--$0.045$) but degrades at $\alpha_{\max} = 2.0$
+($0.057$), confirming that the default $\alpha_{\max} = 0.5$ is safe.
 
 \paragraph{Wasserstein weight $\lambda$.}
-Table~\ref{tab:sens-lambda} (forthcoming) reports $T$-side KS on
-\texttt{cox\_both} across
-$\lambda \in \{0, 0.05, 0.1, 0.2, 0.5, 1.0\}$. Note that $\lambda = 0$
-is the ``likelihood only'' ablation; any improvement at $\lambda > 0$
-directly demonstrates the contribution of the Soft--NA Wasserstein
-regularizer.
+Table~\ref{tab:sens-lambda} reports $T$-side KS on \texttt{cox\_both}
+and \texttt{heavy\_tail\_t}. On \texttt{cox\_both}, a U-shaped curve
+emerges: $\lambda = 0$ (likelihood only) gives $0.058$, improving to
+$0.052$ at $\lambda = 0.1$ ($10\%$ reduction) and degrading to $0.066$
+at $\lambda = 1.0$. On \texttt{heavy\_tail\_t}, all $\lambda$ values
+give $0.089$--$0.090$, indicating the regularizer neither helps nor
+hurts.
+
+\begin{table}[h]
+\caption{$T$-KS across $\lambda$ (Wasserstein weight), 20 MC runs each.}
+\label{tab:sens-lambda}
+\centering
+\small
+\begin{tabular}{lcccccc}
+\toprule
+DGP & $\lambda{=}0$ & $0.05$ & $0.1$ & $0.2$ & $0.5$ & $1.0$ \\
+\midrule
+\texttt{cox\_both} & $0.058$ & $0.053$ & $\mathbf{0.052}$ & $0.054$ & $0.059$ & $0.066$ \\
+\texttt{heavy\_tail\_t} & $0.089$ & $0.090$ & $0.090$ & $0.089$ & $0.089$ & $0.090$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \paragraph{Number of MC simulations $S$.}
-Table~\ref{tab:sens-S} (forthcoming) reports $T$-side KS on
-\texttt{cox\_both} across $S \in \{1, 3, 5, 10\}$. Each epoch draws
-fresh noise for all $S$ simulations, so the model is exposed to
-$S \times \text{epochs}$ distinct simulated curves over training.
+Performance is flat across $S \in \{1, 3, 5, 10\}$ on \texttt{cox\_both}
+($T$-KS $0.052$--$0.056$). Even $S = 1$ suffices, confirming that each
+epoch's fresh noise provides adequate gradient signal without multiple
+simulation draws.
+
+\begin{table}[h]
+\caption{$T$-KS across $S$ (MC simulations per batch), \texttt{cox\_both}, 10 MC runs.}
+\label{tab:sens-S}
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+$S$ & $1$ & $3$ & $5$ & $10$ \\
+\midrule
+$T$-KS & $0.052\,{\pm}\,0.010$ & $0.056\,{\pm}\,0.009$ & $0.053\,{\pm}\,0.010$ & $0.055\,{\pm}\,0.010$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Identifiability of the Conditional Flow Model}
 \label{app:identifiability}
